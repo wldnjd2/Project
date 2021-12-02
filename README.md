@@ -25,8 +25,16 @@
 
 ### **졸업작품**
 ---
-[AVR 프로세서를 이용한 MIDI 인터페이스 제작](https://github.com/wldnjd2/Project/tree/main/KNUniv/%EC%A1%B8%EC%97%85%EC%9E%91%ED%92%88)<br>
-
+작품명: AVR 프로세서를 이용한 MIDI 인터페이스 제작
+사용언어: 어셈블러
+작품내용
+- MIDI 프로토콜을 이용하여 컴퓨터와 피아노가 통신할 수 있는 MIDI 인터페이스 제작
+- 다이나믹 스캐닝을 이용해 피아노 스위치를 검출하고 직렬통신을 이용해 컴퓨터와 통신하도록 제작
+- 건반 세개를 동시에 눌렀을때 누르지 않은 다른키가 발생하는 고스트키를 ADC를 이용해 제거
+- 피아노 건반 상태를 플래그 변수로 할당하여 총 32개의 피아노 건반을 따로따로 검출하여 동시에 여러가지 키를
+눌렀을때 건반별로 비아노 음을 처리할 수 있게 제작
+[졸업 작품 보고서 링크](https://github.com/wldnjd2/Project/blob/main/KNUniv/%EC%A1%B8%EC%97%85%EC%9E%91%ED%92%88/%EC%A1%B8%EC%97%85%EC%9E%91%ED%92%88_%EB%B3%B4%EA%B3%A0%EC%84%9C.hwp.pdf)<br>
+[졸업 작품 코드](https://github.com/wldnjd2/Project/blob/main/KNUniv/%EC%A1%B8%EC%97%85%EC%9E%91%ED%92%88/%EC%A1%B8%EC%97%85%EC%9E%91%ED%92%88_%EC%B5%9C%EC%A2%85%EC%BD%94%EB%93%9C_%EB%B3%B4%EA%B4%80%EC%9A%A9.txt)
 <br> 
 
 ### **자격증**
