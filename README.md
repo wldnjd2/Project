@@ -27,7 +27,7 @@
 ---
 작품명: AVR 프로세서를 이용한 MIDI 인터페이스 제작 <br> 
 사용언어: 어셈블러 <br> 
-[졸업 작품 보고서 링크](https://github.com/wldnjd2/Project/blob/main/KNUniv/%EC%A1%B8%EC%97%85%EC%9E%91%ED%92%88/%EC%A1%B8%EC%97%85%EC%9E%91%ED%92%88_%EB%B3%B4%EA%B3%A0%EC%84%9C.hwp.pdf)<br>
+[졸업 작품 보고서](https://github.com/wldnjd2/Project/blob/main/KNUniv/%EC%A1%B8%EC%97%85%EC%9E%91%ED%92%88/%EC%A1%B8%EC%97%85%EC%9E%91%ED%92%88_%EB%B3%B4%EA%B3%A0%EC%84%9C.hwp.pdf)<br>
 [졸업 작품 코드](https://github.com/wldnjd2/Project/blob/main/KNUniv/%EC%A1%B8%EC%97%85%EC%9E%91%ED%92%88/%EC%A1%B8%EC%97%85%EC%9E%91%ED%92%88_%EC%B5%9C%EC%A2%85%EC%BD%94%EB%93%9C_%EB%B3%B4%EA%B4%80%EC%9A%A9.txt) <br> 
 
 작품내용 <br> 
@@ -42,7 +42,7 @@
 ### **자격증**
 ---
 - 정보처리기사 (2019년 취득)
-- 운전면허 (2019년 취득)
+- 자동차운전면허증 2종보통 (2019년 취득)
 
 <br> 
 
@@ -74,10 +74,10 @@ https://wldnjd2.github.io/
 
 <br> 
 
-### **Project**
+### **Project Kaggle**
 ---
 - 대회: 2021 Kaggle Machine Learning & Data Science Survey <br>
-=> Kaggle의 데이터를 분석하고, 시각화하는 프로젝트
+- 내용: Kaggle의 데이터를 분석하고, 시각화하는 프로젝트
 - 기간: 2021.11~ (한달)
 - 사용언어: Python 
 - 라이브러리: Plotly
