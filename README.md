@@ -1,7 +1,22 @@
 ### 공주대학교 정보통신공학부 졸업
 ---
 2015년 3월 입학 - 2019년 2월 졸업
-
+C언어 프로그래밍
+JAVA 프로그래밍
+C++ 프로그래밍 
+Matlab 
+자료구조 및 알고리즘
+데이터베이스 
+운영체제
+영상신호 처리 및 부호화
+정보보안
+마이크로프로세서
+통신이론
+신호처리
+기조전자실험
+전자회로
+임베디드시스템설계
+PADS (PCB 기판 설계)
 <br> 
 
 ### **졸업작품**
@@ -12,15 +27,15 @@
 
 ### **자격증**
 ---
-- 정보처리기사
-- 운전면허
+- 정보처리기사 (2019년 취득)
+- 운전면허 (2019년 취득)
 
 <br> 
 
 ### **Tech Blog**
 ---
 개설일: 21.10.28 ~ <br>
-[링크](https://wldnjd2.github.io/)
+https://wldnjd2.github.io/
 
 <br>
 
@@ -28,11 +43,11 @@
 ---
 - 수원 롯데몰 빌리엔젤 <br>
   2021/06/14 - 2021/10/29
-- 수원 롯데몰 스트릿 츄러스  <br>
+- 수원 롯데몰 스트릿츄러스  <br>
   2021/04/01 - 2021/06/13
 - 수원 2도비어 <br>
   2020/06/01 - 2020/08/01 
-- 포베이 수원 AK지점 <br>
+- 포베이 수원AK지점 <br>
   2019/09/01 - 2019/11/01
 - 포메인 수원권선점 <br>
   2019/04/01 - 2019/07/01
@@ -47,7 +62,10 @@
 
 ### **Project**
 ---
-- 대회: 2021 Kaggle Machine Learning & Data Science Survey
+- 대회: 2021 Kaggle Machine Learning & Data Science Survey <br>
+=> Kaggle의 데이터를 분석하고, 시각화하는 프로젝트
 - 기간: 2021.11~ (한달)
-- [링크](https://github.com/wldnjd2/Project/tree/main/Project_kaggle)
+- 사용언어: Python 
+- 라이브러리: Plotly
+- [Kaggle 프로젝트 자세히 보기](https://github.com/wldnjd2/Project/tree/main/Project_kaggle)
 <br> 
