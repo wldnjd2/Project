@@ -25,8 +25,7 @@
 
 ### **졸업작품**
 ---
-[AVR 프로세서를 이용한 MIDI 인터페이스 제작]
-(https://github.com/wldnjd2/Project/tree/main/KNUniv/%EC%A1%B8%EC%97%85%EC%9E%91%ED%92%88)<br>
+[AVR 프로세서를 이용한 MIDI 인터페이스 제작](https://github.com/wldnjd2/Project/tree/main/KNUniv/%EC%A1%B8%EC%97%85%EC%9E%91%ED%92%88)<br>
 
 <br> 
 
