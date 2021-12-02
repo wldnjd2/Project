@@ -33,8 +33,9 @@
 - 건반 세개를 동시에 눌렀을때 누르지 않은 다른키가 발생하는 고스트키를 ADC를 이용해 제거
 - 피아노 건반 상태를 플래그 변수로 할당하여 총 32개의 피아노 건반을 따로따로 검출하여 동시에 여러가지 키를
 눌렀을때 건반별로 비아노 음을 처리할 수 있게 제작 <br> 
-- [졸업 작품 보고서 링크](https://github.com/wldnjd2/Project/blob/main/KNUniv/%EC%A1%B8%EC%97%85%EC%9E%91%ED%92%88/%EC%A1%B8%EC%97%85%EC%9E%91%ED%92%88_%EB%B3%B4%EA%B3%A0%EC%84%9C.hwp.pdf)<br>
-- [졸업 작품 코드](https://github.com/wldnjd2/Project/blob/main/KNUniv/%EC%A1%B8%EC%97%85%EC%9E%91%ED%92%88/%EC%A1%B8%EC%97%85%EC%9E%91%ED%92%88_%EC%B5%9C%EC%A2%85%EC%BD%94%EB%93%9C_%EB%B3%B4%EA%B4%80%EC%9A%A9.txt) <br> 
+
+[졸업 작품 보고서 링크](https://github.com/wldnjd2/Project/blob/main/KNUniv/%EC%A1%B8%EC%97%85%EC%9E%91%ED%92%88/%EC%A1%B8%EC%97%85%EC%9E%91%ED%92%88_%EB%B3%B4%EA%B3%A0%EC%84%9C.hwp.pdf)<br>
+[졸업 작품 코드](https://github.com/wldnjd2/Project/blob/main/KNUniv/%EC%A1%B8%EC%97%85%EC%9E%91%ED%92%88/%EC%A1%B8%EC%97%85%EC%9E%91%ED%92%88_%EC%B5%9C%EC%A2%85%EC%BD%94%EB%93%9C_%EB%B3%B4%EA%B4%80%EC%9A%A9.txt) <br> 
 <br> 
 
 ### **자격증**
