@@ -1,0 +1,4198 @@
+	.nolist
+	.include"m164padef.inc"
+	.list
+;
+	.equ	I_GROUP = PORTB
+	.equ	I_SW	= PINA
+;
+;============================
+; 레지스터 할당
+;============================
+.def	R_COM_Q_CNT = R15			; 메시지 큐 카운터
+.def	R_MIDI_Q_CNT = R19			; MIDI 카운터-------------------------------------------------------------------------------------------------------------------
+
+
+; Y(R28, R29) - Push/Pop Pointer 전용
+; Z(R30, R31) - Interrupt Pointer 전용
+;
+	.dseg
+	.org	SRAM_START
+
+S_SW_STATUS_00:		.byte	1		;그룹0 갈색 
+S_SW_COUNT_00:		.byte	1
+S_SW_STATUS_01:		.byte	1
+S_SW_COUNT_01:		.byte	1
+S_SW_STATUS_02:		.byte	1
+S_SW_COUNT_02:		.byte	1
+S_SW_STATUS_03:		.byte	1
+S_SW_COUNT_03:		.byte	1
+S_SW_STATUS_04:		.byte	1
+S_SW_COUNT_04:		.byte	1
+S_SW_STATUS_05:		.byte	1
+S_SW_COUNT_05:		.byte	1
+S_SW_STATUS_06:		.byte	1
+S_SW_COUNT_06:		.byte	1
+S_SW_STATUS_07:		.byte	1
+S_SW_COUNT_07:		.byte	1
+;
+S_SW_STATUS_10:		.byte	1		;그룹 1 초록
+S_SW_COUNT_10:		.byte	1
+S_SW_STATUS_11:		.byte	1
+S_SW_COUNT_11:		.byte	1
+S_SW_STATUS_12:		.byte	1
+S_SW_COUNT_12:		.byte	1
+S_SW_STATUS_13:		.byte	1
+S_SW_COUNT_13:		.byte	1
+S_SW_STATUS_15:		.byte	1
+S_SW_COUNT_15:		.byte	1
+S_SW_STATUS_16:		.byte	1
+S_SW_COUNT_16:		.byte	1
+S_SW_STATUS_17:		.byte	1
+S_SW_COUNT_17:		.byte	1
+;
+S_SW_STATUS_20:		.byte	1		;그룹 2 파랑
+S_SW_COUNT_20:		.byte	1
+S_SW_STATUS_21:		.byte	1
+S_SW_COUNT_21:		.byte	1
+S_SW_STATUS_22:		.byte	1
+S_SW_COUNT_22:		.byte	1
+S_SW_STATUS_23:		.byte	1
+S_SW_COUNT_23:		.byte	1
+S_SW_STATUS_24:		.byte	1
+S_SW_COUNT_24:		.byte	1
+S_SW_STATUS_25:		.byte	1
+S_SW_COUNT_25:		.byte	1
+S_SW_STATUS_26:		.byte	1
+S_SW_COUNT_26:		.byte	1
+S_SW_STATUS_27:		.byte	1
+S_SW_COUNT_27:		.byte	1
+;
+S_SW_STATUS_34:		.byte	1		;그룹 3 흰색
+S_SW_COUNT_34:		.byte	1
+;
+S_SW_STATUS_40:		.byte	1		;그룹 4 노랑
+S_SW_COUNT_40:		.byte	1
+S_SW_STATUS_41:		.byte	1
+S_SW_COUNT_41:		.byte	1
+S_SW_STATUS_42:		.byte	1
+S_SW_COUNT_42:		.byte	1
+S_SW_STATUS_43:		.byte	1
+S_SW_COUNT_43:		.byte	1
+S_SW_STATUS_44:		.byte	1
+S_SW_COUNT_44:		.byte	1
+S_SW_STATUS_45:		.byte	1
+S_SW_COUNT_45:		.byte	1
+S_SW_STATUS_46:		.byte	1
+S_SW_COUNT_46:		.byte	1
+S_SW_STATUS_47:		.byte	1
+S_SW_COUNT_47:		.byte	1
+;
+S_COM_PUSH_PNTL:	.byte	1		; 송신 메시지 큐
+S_COM_PUSH_PNTH:	.byte	1
+S_COM_POP_PNTL:		.byte	1
+S_COM_POP_PNTH:		.byte	1
+;
+C_COM_Q_START:		.byte	64		
+C_COM_Q_END:
+;
+S_MIDI_PUSH_PNTL:	.byte	1		; 송신 MIDI 큐------------------------------------------------------------------------------------------------------------------
+S_MIDI_PUSH_PNTH:	.byte	1
+S_MIDI_POP_PNTL:	.byte	1
+S_MIDI_POP_PNTH:	.byte	1
+;
+C_MIDI_Q_START:		.byte	64		
+C_MIDI_Q_END:
+;
+	.cseg
+	.org	0x000					; RESET Vector
+	rjmp	RESET
+	.org	0x01A					; Timer1 COMPA INT
+	rjmp	TINT1
+RESET:
+	ldi		R16,HIGH(RAMEND)		;스택 포인터 초기화
+	out		SPH,R16
+	ldi 	R16,LOW(RAMEND)
+	out		SPL,R16
+;=============================
+;  I/O 초기화
+;=============================
+;
+;포트설정
+;===========
+	ldi		R16,0b00000000
+	out		DDRA,R16				; 포트A를 입력으로 설정(스위치 상태 입력)
+
+	ldi		R16,0b00011111			; 그룹 선택 포트 - 0:Group0 ~ 4:Group4
+	out 	DDRB,R16
+	clr		R16						; 일단 모두 off
+	out		PORTB,R16
+
+;=============================
+; USART1 초기화				;MIDI-----------------------------------------------------------------------------------------------------------------------------------
+;=============================
+;Baud Rate 초기화 
+;
+;8MHz
+;31.25k bps 로 맞춰야함			
+;UBRR	15 로 맞추면 됨	
+;ERROR	0.2%
+	ldi	R16,HIGH(15)
+	sts	UBRR1H,R16
+	ldi	R16,LOW(15)
+	sts	UBRR1L,R16
+
+	ldi		R16,0b00001010
+	out		DDRD,R16				;입력; RxD은 0으로 설정
+									;출력; TxD은 1로 설정	
+								
+;UCSRA 레지스터 초기화
+	ldi		R16,0
+	sts		UCSR1A,R16
+
+;UCSRB 레지스터 초기화
+;    	RXCIE	TXCIE	UDRIE	fRXEN	TXEN	UCSZ2	RXB8	TXB8
+;	0	0	0	1	1	0	0	0
+;b7	데이터 수신완료 인터럽트
+;b6	데이터 송신완료 인터럽트
+;b5	데이터 레지스터 비었을때 인터럽트
+;b4	비트가 1일때 수신기능 가능하게 함
+;b3	비트가 1일때 송신기능 가능하게 함
+;b2	UCSRC 레지스터의 UCSZ0,UCSZ1와 같이 쓰임
+;b1	수신 데이터를 9비트로 설정했을때 추가 1비트로 사용하는 비트
+;b0	송신 데이터를 9비트로 설정했을때 추가 1비트로 사용하는 비트
+	ldi		R16,0b00011000
+	sts		UCSR1B,R16
+
+;UCSRC 레지스터 초기화
+;	URSEL 	UMSEL	UPM1	UPM0	USBS	UCSZ1	UCSZ0	UCPOL
+;	1	0	0	0	0	1	1	0
+;b7	UCSRC 또는 UBRRH 레지스터 선택
+;b6	동기식일때 1 비동기식일때 0
+;b5;b4	송수신시 패리티비트에 대한 옵션 비트가 00일때 사용하지 않음
+;b3	stop bit 결정 비트가 0일때 stop bit는 1
+;b2;b1	데이터 비트 수를 결정 비트가 011일때 8비트
+;b0	비동기 모드이므로 사용하지 않음
+	ldi		R16,0b10000110
+	sts		UCSR1C,R16
+;=============================
+; USART0 초기화				;콘솔
+;=============================
+;Baud Rate 초기화 
+;
+;8MHz
+;19.6k bps			
+;UBRR	25	
+;ERROR	0.2%
+	ldi		R16,HIGH(25)
+	sts  	UBRR0H,R16
+	ldi 	R16,LOW(25)
+	sts		UBRR0L,R16
+
+;	ldi		R16,0x02
+;	out		DDRD,R16				;입력; RxD은 0으로 설정
+									;출력; TxD은 1로 설정	
+;UCSRA 레지스터 초기화
+	ldi		R16,0
+	sts		UCSR0A,R16
+
+;UCSRB 레지스터 초기화
+;    	RXCIE	TXCIE	UDRIE	fRXEN	TXEN	UCSZ2	RXB8	TXB8
+;	0	0	0	1	1	0	0	0
+;b7	데이터 수신완료 인터럽트
+;b6	데이터 송신완료 인터럽트
+;b5	데이터 레지스터 비었을때 인터럽트
+;b4	비트가 1일때 수신기능 가능하게 함
+;b3	비트가 1일때 송신기능 가능하게 함
+;b2	UCSRC 레지스터의 UCSZ0,UCSZ1와 같이 쓰임
+;b1	수신 데이터를 9비트로 설정했을때 추가 1비트로 사용하는 비트
+;b0	송신 데이터를 9비트로 설정했을때 추가 1비트로 사용하는 비트
+	ldi		R16,0b00011000
+	sts		UCSR0B,R16
+
+;UCSRC 레지스터 초기화
+;	URSEL 	UMSEL	UPM1	UPM0	USBS	UCSZ1	UCSZ0	UCPOL
+;	1	0	0	0	0	1	1	0
+;b7	UCSRC 또는 UBRRH 레지스터 선택
+;b6	동기식일때 1 비동기식일때 0
+;b5;b4	송수신시 패리티비트에 대한 옵션 비트가 00일때 사용하지 않음
+;b3	stop bit 결정 비트가 0일때 stop bit는 1
+;b2;b1	데이터 비트 수를 결정 비트가 011일때 8비트
+;b0	비동기 모드이므로 사용하지 않음
+	ldi		R16,0b10000110
+	sts		UCSR0C,R16
+
+;=============================
+; 타이머1 초기화
+;=============================	
+	ldi		R16,0b00000000			; TCCR1A
+									;   7, 6 : COM1A - 사용 안함 00
+									;   5, 4 : COM1B - 사용 안함 00
+									;   3, 2 : 사용 안함 00
+									;   1, 0 : WGM11, WGM10 - CTC mode 00
+	sts		TCCR1A,R16
+	ldi		R16,0b00001011			; TCCR1B
+									;   7, 6, 5 : 사용 안함 000
+									;   4, 3 : WGM13, WGM12 - CTC mode 01
+									;   2, 1, 0 : Prescaler - 011 (64분주) (8MHz MCU, 32kHz 목표)
+	sts		TCCR1B,R16
+
+	ldi		R16,HIGH(4)				;
+	sts		OCR1AH,R16				;    상위 먼저!!
+	ldi		R16,LOW(4)
+	sts		OCR1AL,R16
+	ldi		R16,0b00000010			; TIMSK
+									;  1 : OCIE1A - OCR1A 인터럽트만 가동
+	sts		TIMSK1,R16
+;-----------------------------------------------------------------------------------
+;=============================
+; 메세지 큐 변수 초기화
+;=============================
+	ldi		R16,HIGH(C_COM_Q_START)		; 콘솔 메시지 큐 Push Pointer 초기화
+	sts		S_COM_PUSH_PNTH,R16
+	ldi		R16,LOW(C_COM_Q_START)
+	sts		S_COM_PUSH_PNTL,R16
+	ldi		R16,HIGH(C_COM_Q_START)		; 콘솔 메시지 큐 Pop Pointer 초기화
+	sts		S_COM_POP_PNTH,R16
+	ldi		R16,LOW(C_COM_Q_START)
+	sts		S_COM_POP_PNTL,R16
+	clr		R_COM_Q_CNT					; 큐 카운터 초기화
+;
+	ldi		ZH,HIGH(PROC_00)			; 처음 갈 인터럽트 위치
+	ldi		ZL,LOW(PROC_00)
+;=============================
+; MIDI 변수 초기화
+;=============================
+	ldi		R16,HIGH(C_MIDI_Q_START)	; 콘솔 메시지 큐 Push Pointer 초기화
+	sts		S_MIDI_PUSH_PNTH,R16
+	ldi		R16,LOW(C_MIDI_Q_START)
+	sts		S_MIDI_PUSH_PNTL,R16
+	ldi		R16,HIGH(C_MIDI_Q_START)	; 콘솔 메시지 큐 Pop Pointer 초기화
+	sts		S_MIDI_POP_PNTH,R16
+	ldi		R16,LOW(C_MIDI_Q_START)
+	sts		S_MIDI_POP_PNTL,R16
+	clr		R_MIDI_Q_CNT				; 큐 카운터 초기화
+;==============================
+	ldi		R17,'O'
+	rcall	USART
+	ldi		R17,'k'
+	rcall	USART
+	ldi		R17,' '
+	rcall	USART
+	sei									; 인터럽트 개시!
+LOOP:
+	rjmp	LOOP					; 인터럽트 튈때까지 대기 
+;=============================
+; 타이머1 OCRA 매치 인터럽트
+;=============================
+TINT1:
+	push	R16						; 레지스터 퇴피
+	in		R16,SREG
+	push	R16
+;
+	icall							; Z 레지스터에 있는 주소 다녀와
+	rcall	SEND_MIDI_MSG			; MIDI 메시지 처리
+	rcall	SEND_COM_MSG			; 콘솔 메시지 처리
+;
+;
+	pop		R16						; 레지스터 복귀
+	out		SREG,R16
+	pop		R16
+	reti
+;=============================
+; SW00 처리(그룹 0, 스위치 0)
+;=============================
+PROC_00:
+	lds		R16,S_SW_STATUS_00		; SW 상태변수
+	tst		R16
+	breq	PROC_00_0				; = 0? - Yes
+	cpi		R16,1
+	breq	PROC_00_1				; = 1? - Yes
+	cpi		R16,2
+	breq	PROC_00_2				; = 2? - Yes
+; 상태 3 처리
+	lds		R16,S_SW_COUNT_00		; SW카운터
+	dec		R16						; --
+	sts		S_SW_COUNT_00,R16
+	brne	PROC_00_END2			;  No
+	ldi		R16,0					; SW상태 <- 0
+	sts		S_SW_STATUS_00,R16
+	rjmp	PROC_00_END				; 끝
+; 상태 2 처리
+PROC_00_2:
+	ldi		R16,0b00000001			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,0					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	breq 	PROC_00_END2			; 계속 눌려 있다면 끝
+;#####################
+
+	ldi		R16,3					; SW 상태 <- 3
+	sts		S_SW_STATUS_00,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_00,R16
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note off message
+	rcall	PUSH_MIDI_MSGQ
+	ldi		R16,0x51				; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	clr		R16						; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'0'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'0'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'*'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_00_END				; 끝
+;
+; 임시 점프
+PROC_00_END2:
+	rjmp	PROC_00_END
+;--------------------------------
+; 상태 1 처리
+PROC_00_1:
+	lds		R16,S_SW_COUNT_00		; SW카운터
+	dec		R16						; --
+	sts		S_SW_COUNT_00,R16
+	brne	PROC_00_END				;  No
+	ldi		R16,2					; SW상태 <- 2
+	sts		S_SW_STATUS_00,R16
+	rjmp	PROC_00_END				; 끝
+; 상태 0 처리
+PROC_00_0:
+	ldi		R16,0b00000001			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,0					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	brne 	PROC_00_END2			; 안눌렸다면 끝
+;#####################
+
+	ldi		R16,1					; SW 상태 <- 1
+	sts		S_SW_STATUS_00,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_00,R16
+;
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note on message
+	rcall	PUSH_MIDI_MSGQ
+	ldi		R16,0x51				; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	ldi		R16,0b01111111			; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'0'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'0'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'#'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_00_END				; 끝
+
+; 끝 마무리
+PROC_00_END:
+	ldi		ZH,HIGH(PROC_01)		; 다음 갈 인터럽트 위치
+	ldi		ZL,LOW(PROC_01)
+	ret
+;=============================
+; SW01 처리(그룹 0, 스위치 1)
+;=============================
+PROC_01:
+	lds		R16,S_SW_STATUS_01		; SW 상태변수
+	tst		R16
+	breq	PROC_01_0				; = 0? - Yes
+	cpi		R16,1
+	breq	PROC_01_1				; = 1? - Yes
+	cpi		R16,2
+	breq	PROC_01_2				; = 2? - Yes
+; 상태 3 처리
+	lds		R16,S_SW_COUNT_01		; SW카운터
+	dec		R16			; --
+	sts		S_SW_COUNT_01,R16
+	brne	PROC_01_END2			;  No
+	ldi		R16,0					; SW상태 <- 0
+	sts		S_SW_STATUS_01,R16
+	rjmp	PROC_01_END				; 끝
+; 상태 2 처리
+PROC_01_2:
+	ldi		R16,0b00000001			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,1					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	breq 	PROC_01_END2			; 계속 눌려 있다면 끝
+;#####################
+
+	ldi		R16,3					; SW 상태 <- 3
+	sts		S_SW_STATUS_01,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_01,R16
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note off message
+	rcall	PUSH_MIDI_MSGQ
+	ldi		R16,0x52					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	clr		R16						; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'0'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'1'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'*'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_01_END				; 끝
+	;
+; 임시 점프
+PROC_01_END2:
+	rjmp	PROC_01_END
+;--------------------------------
+; 상태 1 처리
+PROC_01_1:
+	lds		R16,S_SW_COUNT_01		; SW카운터
+	dec		R16						; --
+	sts		S_SW_COUNT_01,R16
+	brne	PROC_01_END				;  No
+	ldi		R16,2					; SW상태 <- 2
+	sts		S_SW_STATUS_01,R16
+	rjmp	PROC_01_END				; 끝
+; 상태 0 처리
+PROC_01_0:
+	ldi		R16,0b00000001			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,1					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	brne 	PROC_01_END			; 안눌렸다면 끝
+;#####################
+
+	ldi		R16,1					; SW 상태 <- 1
+	sts		S_SW_STATUS_01,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_01,R16
+;
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note on message
+	rcall	PUSH_MIDI_MSGQ
+	ldi		R16,0x52					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	ldi		R16,0b01111111			; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'0'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'1'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'#'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_01_END				; 끝
+
+; 끝 마무리
+PROC_01_END:
+	ldi		ZH,HIGH(PROC_02)		; 다음 갈 인터럽트 위치
+	ldi		ZL,LOW(PROC_02)
+	ret
+
+;=============================
+; SW02 처리(그룹 0, 스위치 2)
+;=============================
+PROC_02:
+	lds		R16,S_SW_STATUS_02		; SW 상태변수
+	tst		R16
+	breq	PROC_02_0				; = 0? - Yes
+	cpi		R16,1
+	breq	PROC_02_1				; = 1? - Yes
+	cpi		R16,2
+	breq	PROC_02_2				; = 2? - Yes
+; 상태 3 처리
+	lds		R16,S_SW_COUNT_02		; SW카운터
+	dec		R16					; --
+	sts		S_SW_COUNT_02,R16
+	brne	PROC_02_END2			;  No
+	ldi		R16,0					; SW상태 <- 0
+	sts		S_SW_STATUS_02,R16
+	rjmp	PROC_02_END				; 끝
+; 상태 2 처리
+PROC_02_2:
+	ldi		R16,0b00000001			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,2					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	breq 	PROC_02_END2			; 계속 눌려 있다면 끝
+;#####################
+
+	ldi		R16,3					; SW 상태 <- 3
+	sts		S_SW_STATUS_02,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_02,R16
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note off message
+	rcall	PUSH_MIDI_MSGQ
+	ldi		R16,0x4D					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	clr		R16						; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'0'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'2'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'*'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_02_END				; 끝
+	;
+; 임시 점프
+PROC_02_END2:
+	rjmp	PROC_02_END
+;--------------------------------
+; 상태 1 처리
+PROC_02_1:
+	lds		R16,S_SW_COUNT_02		; SW카운터
+	dec		R16						; --
+	sts		S_SW_COUNT_02,R16
+	brne	PROC_02_END				;  No
+	ldi		R16,2					; SW상태 <- 2
+	sts		S_SW_STATUS_02,R16
+	rjmp	PROC_02_END				; 끝
+; 상태 0 처리
+PROC_02_0:
+	ldi		R16,0b00000001			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,2					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	brne 	PROC_02_END			; 안눌렸다면 끝
+;#####################
+
+
+;	rcall	SUB_NOP
+;	in		R16,I_SW				; 스위치 읽음
+;	andi	R16,0b00000100			; <============ 스위치 번호
+;	brne	PROC_02_END
+	ldi		R16,1					; SW 상태 <- 1
+	sts		S_SW_STATUS_02,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_02,R16
+;
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note on message
+	rcall	PUSH_MIDI_MSGQ
+	ldi		R16,0x4D					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	ldi		R16,0b01111111			; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'0'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'2'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'#'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_02_END				; 끝
+
+; 끝 마무리
+PROC_02_END:
+	ldi		ZH,HIGH(PROC_03)		; 다음 갈 인터럽트 위치
+	ldi		ZL,LOW(PROC_03)
+	ret
+
+;=============================
+; SW03 처리(그룹 0, 스위치 3) 갈초 
+;=============================
+PROC_03:
+	lds		R16,S_SW_STATUS_03		; SW 상태변수
+	tst		R16
+	breq	PROC_03_0				; = 0? - Yes
+	cpi		R16,1
+	breq	PROC_03_1				; = 1? - Yes
+	cpi		R16,2
+	breq	PROC_03_2				; = 2? - Yes
+; 상태 3 처리
+	lds		R16,S_SW_COUNT_03		; SW카운터
+	dec		R16					; --
+	sts		S_SW_COUNT_03,R16
+	brne	PROC_03_END2			;  No
+	ldi		R16,0					; SW상태 <- 0
+	sts		S_SW_STATUS_03,R16
+	rjmp	PROC_03_END				; 끝
+; 상태 2 처리
+PROC_03_2:
+	ldi		R16,0b00000001			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,3					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	breq 	PROC_03_END2			; 계속 눌려 있다면 끝
+;#####################
+
+	ldi		R16,3					; SW 상태 <- 3
+	sts		S_SW_STATUS_03,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_03,R16
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note off message
+	rcall	PUSH_MIDI_MSGQ
+	ldi		R16,0x4F				; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	clr		R16						; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'0'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'3'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'*'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_03_END				; 끝
+	;
+; 임시 점프
+PROC_03_END2:
+	rjmp	PROC_03_END
+;--------------------------------
+; 상태 1 처리
+PROC_03_1:
+	lds		R16,S_SW_COUNT_03		; SW카운터
+	dec		R16						; --
+	sts		S_SW_COUNT_03,R16
+	brne	PROC_03_END				;  No
+	ldi		R16,2					; SW상태 <- 2
+	sts		S_SW_STATUS_03,R16
+	rjmp	PROC_03_END				; 끝
+; 상태 0 처리
+PROC_03_0:
+	ldi		R16,0b00000001			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,3					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	brne 	PROC_03_END2			; 안눌렸다면 끝
+;#####################
+
+
+	ldi		R16,1					; SW 상태 <- 1
+	sts		S_SW_STATUS_03,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_03,R16
+;
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note on message
+	rcall	PUSH_MIDI_MSGQ
+	ldi		R16,0x4F					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	ldi		R16,0b01111111			; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'0'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'3'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'#'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_03_END				; 끝
+
+; 끝 마무리
+PROC_03_END:
+	ldi		ZH,HIGH(PROC_04)		; 다음 갈 인터럽트 위치
+	ldi		ZL,LOW(PROC_04)
+	ret
+
+;=============================
+; SW04 처리(그룹 0, 스위치 4) 갈파  
+;=============================
+PROC_04:
+	lds		R16,S_SW_STATUS_04		; SW 상태변수
+	tst		R16
+	breq	PROC_04_0				; = 0? - Yes
+	cpi		R16,1
+	breq	PROC_04_1				; = 1? - Yes
+	cpi		R16,2
+	breq	PROC_04_2				; = 2? - Yes
+; 상태 3 처리
+	lds		R16,S_SW_COUNT_04		; SW카운터
+	dec		R16					; --
+	sts		S_SW_COUNT_04,R16
+	brne	PROC_04_END2			;  No
+	ldi		R16,0					; SW상태 <- 0
+	sts		S_SW_STATUS_04,R16
+	rjmp	PROC_04_END				; 끝
+; 상태 2 처리
+PROC_04_2:
+	ldi		R16,0b00000001			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,4					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	breq 	PROC_04_END2			; 계속 눌려 있다면 끝
+;#####################
+
+	ldi		R16,3					; SW 상태 <- 3
+	sts		S_SW_STATUS_04,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_04,R16
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note off message
+	rcall	PUSH_MIDI_MSGQ
+	ldi	R16,0x4C					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	clr		R16						; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'0'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'4'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'*'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_04_END				; 끝
+	;
+; 임시 점프
+PROC_04_END2:
+	rjmp	PROC_04_END
+;--------------------------------
+; 상태 1 처리
+PROC_04_1:
+	lds		R16,S_SW_COUNT_04		; SW카운터
+	dec		R16						; --
+	sts		S_SW_COUNT_04,R16
+	brne	PROC_04_END				;  No
+	ldi		R16,2					; SW상태 <- 2
+	sts		S_SW_STATUS_04,R16
+	rjmp	PROC_04_END				; 끝
+; 상태 0 처리
+PROC_04_0:
+	ldi		R16,0b00000001			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,4					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	brne 	PROC_04_END2			; 안눌렸다면 끝
+;#####################
+
+	ldi		R16,1					; SW 상태 <- 1
+	sts		S_SW_STATUS_04,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_04,R16
+;
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note on message
+	rcall	PUSH_MIDI_MSGQ
+	ldi	R16,0x4C					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	ldi		R16,0b01111111			; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'0'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'4'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'#'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_04_END				; 끝
+
+; 끝 마무리
+PROC_04_END:
+	ldi		ZH,HIGH(PROC_05)		; 다음 갈 인터럽트 위치
+	ldi		ZL,LOW(PROC_05)
+	ret
+
+;=============================
+; SW05 처리(그룹 0, 스위치 5) 갈갈   
+;=============================
+PROC_05:
+	lds		R16,S_SW_STATUS_05		; SW 상태변수
+	tst		R16
+	breq	PROC_05_0				; = 0? - Yes
+	cpi		R16,1
+	breq	PROC_05_1				; = 1? - Yes
+	cpi		R16,2
+	breq	PROC_05_2				; = 2? - Yes
+; 상태 3 처리
+	lds		R16,S_SW_COUNT_05		; SW카운터
+	dec		R16					; --
+	sts		S_SW_COUNT_05,R16
+	brne	PROC_05_END2			;  No
+	ldi		R16,0					; SW상태 <- 0
+	sts		S_SW_STATUS_05,R16
+	rjmp	PROC_05_END				; 끝
+; 상태 2 처리
+PROC_05_2:
+	ldi		R16,0b00000001			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,5					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	breq 	PROC_05_END2			; 계속 눌려 있다면 끝
+;#####################
+
+	ldi		R16,3					; SW 상태 <- 3
+	sts		S_SW_STATUS_05,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_05,R16
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note off message
+	rcall	PUSH_MIDI_MSGQ
+	ldi	R16,0x50					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	clr		R16						; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'0'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'5'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'*'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_05_END				; 끝
+	;
+; 임시 점프
+PROC_05_END2:
+	rjmp	PROC_05_END
+;--------------------------------
+; 상태 1 처리
+PROC_05_1:
+	lds		R16,S_SW_COUNT_05		; SW카운터
+	dec		R16						; --
+	sts		S_SW_COUNT_05,R16
+	brne	PROC_05_END				;  No
+	ldi		R16,2					; SW상태 <- 2
+	sts		S_SW_STATUS_05,R16
+	rjmp	PROC_05_END				; 끝
+; 상태 0 처리
+PROC_05_0:
+	ldi		R16,0b00000001			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,5					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	brne 	PROC_05_END2			; 안눌렸다면 끝
+;#####################
+
+	ldi		R16,1					; SW 상태 <- 1
+	sts		S_SW_STATUS_05,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_05,R16
+;
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note on message
+	rcall	PUSH_MIDI_MSGQ
+	ldi	R16,0x50					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	ldi		R16,0b01111111			; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'0'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'5'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'#'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_05_END				; 끝
+
+; 끝 마무리
+PROC_05_END:
+	ldi		ZH,HIGH(PROC_06)		; 다음 갈 인터럽트 위치
+	ldi		ZL,LOW(PROC_06)
+	ret
+;=============================
+; SW06 처리(그룹 0, 스위치 6) 갈검    
+;=============================
+PROC_06:
+	lds		R16,S_SW_STATUS_06		; SW 상태변수
+	tst		R16
+	breq	PROC_06_0				; = 0? - Yes
+	cpi		R16,1
+	breq	PROC_06_1				; = 1? - Yes
+	cpi		R16,2
+	breq	PROC_06_2				; = 2? - Yes
+; 상태 3 처리
+	lds		R16,S_SW_COUNT_06		; SW카운터
+	dec		R16					; --
+	sts		S_SW_COUNT_06,R16
+	brne	PROC_06_END2			;  No
+	ldi		R16,0					; SW상태 <- 0
+	sts		S_SW_STATUS_06,R16
+	rjmp	PROC_06_END				; 끝
+; 상태 2 처리
+PROC_06_2:
+	ldi		R16,0b00000001			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,6					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	breq 	PROC_06_END2			; 계속 눌려 있다면 끝
+;#####################
+
+	ldi		R16,3					; SW 상태 <- 3
+	sts		S_SW_STATUS_06,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_06,R16
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note off message
+	rcall	PUSH_MIDI_MSGQ
+	ldi	R16,0x4E					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	clr		R16						; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'0'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'6'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'*'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_06_END				; 끝
+	;
+; 임시 점프
+PROC_06_END2:
+	rjmp	PROC_06_END
+;--------------------------------
+; 상태 1 처리
+PROC_06_1:
+	lds		R16,S_SW_COUNT_06		; SW카운터
+	dec		R16						; --
+	sts		S_SW_COUNT_06,R16
+	brne	PROC_06_END				;  No
+	ldi		R16,2					; SW상태 <- 2
+	sts		S_SW_STATUS_06,R16
+	rjmp	PROC_06_END				; 끝
+; 상태 0 처리
+PROC_06_0:
+	ldi		R16,0b00000001			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,6					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	brne 	PROC_06_END2			; 안눌렸다면 끝
+;#####################
+
+	ldi		R16,1					; SW 상태 <- 1
+	sts		S_SW_STATUS_06,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_06,R16
+;
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note on message
+	rcall	PUSH_MIDI_MSGQ
+	ldi	R16,0x4E					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	ldi		R16,0b01111111			; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'0'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'6'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'#'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_06_END				; 끝
+
+; 끝 마무리
+PROC_06_END:
+	ldi		ZH,HIGH(PROC_07)		; 다음 갈 인터럽트 위치
+	ldi		ZL,LOW(PROC_07)
+	ret
+;=============================
+; SW07 처리(그룹 0, 스위치 7) 갈흰     
+;=============================
+PROC_07:
+	lds		R16,S_SW_STATUS_07		; SW 상태변수
+	tst		R16
+	breq	PROC_07_0				; = 0? - Yes
+	cpi		R16,1
+	breq	PROC_07_1				; = 1? - Yes
+	cpi		R16,2
+	breq	PROC_07_2				; = 2? - Yes
+; 상태 3 처리
+	lds		R16,S_SW_COUNT_07		; SW카운터
+	dec		R16					; --
+	sts		S_SW_COUNT_07,R16
+	brne	PROC_07_END2			;  No
+	ldi		R16,0					; SW상태 <- 0
+	sts		S_SW_STATUS_07,R16
+	rjmp	PROC_07_END				; 끝
+; 상태 2 처리
+PROC_07_2:
+	ldi		R16,0b00000001			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,7					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	breq 	PROC_07_END2			; 계속 눌려 있다면 끝
+;#####################
+
+	ldi		R16,3					; SW 상태 <- 3
+	sts		S_SW_STATUS_07,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_07,R16
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note off message
+	rcall	PUSH_MIDI_MSGQ
+	ldi	R16,0x53					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	clr		R16						; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'0'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'7'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'*'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_07_END				; 끝
+	;
+; 임시 점프
+PROC_07_END2:
+	rjmp	PROC_07_END
+;--------------------------------
+; 상태 1 처리
+PROC_07_1:
+	lds		R16,S_SW_COUNT_07		; SW카운터
+	dec		R16						; --
+	sts		S_SW_COUNT_07,R16
+	brne	PROC_07_END				;  No
+	ldi		R16,2					; SW상태 <- 2
+	sts		S_SW_STATUS_07,R16
+	rjmp	PROC_07_END				; 끝
+; 상태 0 처리
+PROC_07_0:
+	ldi		R16,0b00000001			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,7					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	brne 	PROC_07_END2			; 안눌렸다면 끝
+;#####################
+
+	ldi		R16,1					; SW 상태 <- 1
+	sts		S_SW_STATUS_07,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_07,R16
+;
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note on message
+	rcall	PUSH_MIDI_MSGQ
+	ldi	R16,0x53					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	ldi		R16,0b01111111			; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'0'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'7'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'#'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_07_END				; 끝
+
+; 끝 마무리
+PROC_07_END:
+	ldi		ZH,HIGH(PROC_10)		; 다음 갈 인터럽트 위치
+	ldi		ZL,LOW(PROC_10)
+	ret
+
+;=============================
+; SW10 처리(그룹 1, 스위치 0) ;초빨 
+;=============================
+PROC_10:
+	lds		R16,S_SW_STATUS_10		; SW 상태변수
+	tst		R16
+	breq	PROC_10_0				; = 0? - Yes
+	cpi		R16,1
+	breq	PROC_10_1				; = 1? - Yes
+	cpi		R16,2
+	breq	PROC_10_2				; = 2? - Yes
+; 상태 3 처리
+	lds		R16,S_SW_COUNT_10		; SW카운터
+	dec		R16						; --
+	sts		S_SW_COUNT_10,R16
+	brne	PROC_10_END2			;  No
+	ldi		R16,0					; SW상태 <- 0
+	sts		S_SW_STATUS_10,R16
+	rjmp	PROC_10_END				; 끝
+; 상태 2 처리
+PROC_10_2:
+	ldi		R16,0b00000010			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,0					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	breq 	PROC_10_END2			; 계속 눌려 있다면 끝
+;#####################
+
+	ldi		R16,3					; SW 상태 <- 3
+	sts		S_SW_STATUS_10,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_10,R16
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note off message
+	rcall	PUSH_MIDI_MSGQ
+	ldi	R16,0x39					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	clr		R16						; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'1'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'0'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'*'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_10_END				; 끝
+;
+; 임시 점프
+PROC_10_END2:
+	rjmp	PROC_10_END
+;--------------------------------
+; 상태 1 처리
+PROC_10_1:
+	lds		R16,S_SW_COUNT_10		; SW카운터
+	dec		R16						; --
+	sts		S_SW_COUNT_10,R16
+	brne	PROC_10_END				;  No
+	ldi		R16,2					; SW상태 <- 2
+	sts		S_SW_STATUS_10,R16
+	rjmp	PROC_10_END				; 끝
+; 상태 0 처리
+PROC_10_0:
+	ldi		R16,0b00000010			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,0					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	brne 	PROC_10_END2			; 안눌렸다면 끝
+;#####################
+
+	ldi		R16,1					; SW 상태 <- 1
+	sts		S_SW_STATUS_10,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_10,R16
+;
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note on message
+	rcall	PUSH_MIDI_MSGQ
+	ldi	R16,0x39					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	ldi		R16,0b01111111			; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'1'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'0'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'#'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_10_END				; 끝
+
+; 끝 마무리
+PROC_10_END:
+	ldi		ZH,HIGH(PROC_11)		; 다음 갈 인터럽트 위치
+	ldi		ZL,LOW(PROC_11)
+	ret
+;=============================
+; SW11 처리(그룹 1, 스위치 1) ;초주  
+;=============================
+PROC_11:
+	lds		R16,S_SW_STATUS_11		; SW 상태변수
+	tst		R16
+	breq	PROC_11_0				; = 0? - Yes
+	cpi		R16,1
+	breq	PROC_11_1				; = 1? - Yes
+	cpi		R16,2
+	breq	PROC_11_2				; = 2? - Yes
+; 상태 3 처리
+	lds		R16,S_SW_COUNT_11		; SW카운터
+	dec		R16						; --
+	sts		S_SW_COUNT_11,R16
+	brne	PROC_11_END2			;  No
+	ldi		R16,0					; SW상태 <- 0
+	sts		S_SW_STATUS_11,R16
+	rjmp	PROC_11_END				; 끝
+; 상태 2 처리
+PROC_11_2:
+	ldi		R16,0b00000010			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,1					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	breq 	PROC_11_END2			; 계속 눌려 있다면 끝
+;#####################
+
+	ldi		R16,3					; SW 상태 <- 3
+	sts		S_SW_STATUS_11,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_11,R16
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note off message
+	rcall	PUSH_MIDI_MSGQ
+	ldi	R16,0x3A					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	clr		R16						; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'1'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'1'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'*'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_11_END				; 끝
+;
+; 임시 점프
+PROC_11_END2:
+	rjmp	PROC_11_END
+;--------------------------------
+; 상태 1 처리
+PROC_11_1:
+	lds		R16,S_SW_COUNT_11		; SW카운터
+	dec		R16						; --
+	sts		S_SW_COUNT_11,R16
+	brne	PROC_11_END				;  No
+	ldi		R16,2					; SW상태 <- 2
+	sts		S_SW_STATUS_11,R16
+	rjmp	PROC_11_END				; 끝
+; 상태 0 처리
+PROC_11_0:
+	ldi		R16,0b00000010			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,1					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	brne 	PROC_11_END2			; 안눌렸다면 끝
+;#####################
+
+	ldi		R16,1					; SW 상태 <- 1
+	sts		S_SW_STATUS_11,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_11,R16
+;
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note on message
+	rcall	PUSH_MIDI_MSGQ
+	ldi	R16,0x3A					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	ldi		R16,0b01111111			; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'1'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'1'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'#'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_11_END				; 끝
+
+; 끝 마무리
+PROC_11_END:
+	ldi		ZH,HIGH(PROC_12)		; 다음 갈 인터럽트 위치
+	ldi		ZL,LOW(PROC_12)
+	ret
+
+;=============================
+; SW12 처리(그룹 1, 스위치 2) ;초노  
+;=============================
+PROC_12:
+	lds		R16,S_SW_STATUS_12		; SW 상태변수
+	tst		R16
+	breq	PROC_12_0				; = 0? - Yes
+	cpi		R16,1
+	breq	PROC_12_1				; = 1? - Yes
+	cpi		R16,2
+	breq	PROC_12_2				; = 2? - Yes
+; 상태 3 처리
+	lds		R16,S_SW_COUNT_12		; SW카운터
+	dec		R16						; --
+	sts		S_SW_COUNT_12,R16
+	brne	PROC_12_END2			;  No
+	ldi		R16,0					; SW상태 <- 0
+	sts		S_SW_STATUS_12,R16
+	rjmp	PROC_12_END				; 끝
+; 상태 2 처리
+PROC_12_2:
+	ldi		R16,0b00000010			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,2					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	breq 	PROC_12_END2			; 계속 눌려 있다면 끝
+;#####################
+
+	ldi		R16,3					; SW 상태 <- 3
+	sts		S_SW_STATUS_12,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_12,R16
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note off message
+	rcall	PUSH_MIDI_MSGQ
+	ldi	R16,0x35					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	clr		R16						; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'1'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'2'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'*'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_12_END				; 끝
+;
+; 임시 점프
+PROC_12_END2:
+	rjmp	PROC_12_END
+;--------------------------------
+; 상태 1 처리
+PROC_12_1:
+	lds		R16,S_SW_COUNT_12		; SW카운터
+	dec		R16						; --
+	sts		S_SW_COUNT_12,R16
+	brne	PROC_12_END				;  No
+	ldi		R16,2					; SW상태 <- 2
+	sts		S_SW_STATUS_12,R16
+	rjmp	PROC_12_END				; 끝
+; 상태 0 처리
+PROC_12_0:
+	ldi		R16,0b00000010			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,2					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	brne 	PROC_12_END2			; 안눌렸다면 끝
+;#####################
+
+	ldi		R16,1					; SW 상태 <- 1
+	sts		S_SW_STATUS_12,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_12,R16
+;
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note on message
+	rcall	PUSH_MIDI_MSGQ
+	ldi	R16,0x35					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	ldi		R16,0b01111111			; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'1'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'2'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'#'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_12_END				; 끝
+
+; 끝 마무리
+PROC_12_END:
+	ldi		ZH,HIGH(PROC_13)		; 다음 갈 인터럽트 위치
+	ldi		ZL,LOW(PROC_13)
+	ret
+;=============================
+; SW13 처리(그룹 1, 스위치 3) ;초초   
+;=============================
+PROC_13:
+	lds		R16,S_SW_STATUS_13		; SW 상태변수
+	tst		R16
+	breq	PROC_13_0				; = 0? - Yes
+	cpi		R16,1
+	breq	PROC_13_1				; = 1? - Yes
+	cpi		R16,2
+	breq	PROC_13_2				; = 2? - Yes
+; 상태 3 처리
+	lds		R16,S_SW_COUNT_13		; SW카운터
+	dec		R16						; --
+	sts		S_SW_COUNT_13,R16
+	brne	PROC_13_END2			;  No
+	ldi		R16,0					; SW상태 <- 0
+	sts		S_SW_STATUS_13,R16
+	rjmp	PROC_13_END				; 끝
+; 상태 2 처리
+PROC_13_2:
+	ldi		R16,0b00000010			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,3					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	breq 	PROC_13_END2			; 계속 눌려 있다면 끝
+;#####################
+
+	ldi		R16,3					; SW 상태 <- 3
+	sts		S_SW_STATUS_13,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_13,R16
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note off message
+	rcall	PUSH_MIDI_MSGQ
+	ldi	R16,0x37					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	clr		R16						; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'1'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'3'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'*'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_13_END				; 끝
+;
+; 임시 점프
+PROC_13_END2:
+	rjmp	PROC_13_END
+;--------------------------------
+; 상태 1 처리
+PROC_13_1:
+	lds		R16,S_SW_COUNT_13		; SW카운터
+	dec		R16						; --
+	sts		S_SW_COUNT_13,R16
+	brne	PROC_13_END				;  No
+	ldi		R16,2					; SW상태 <- 2
+	sts		S_SW_STATUS_13,R16
+	rjmp	PROC_13_END				; 끝
+; 상태 0 처리
+PROC_13_0:
+	ldi		R16,0b00000010			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,3					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	brne 	PROC_13_END2			; 안눌렸다면 끝
+;#####################
+
+	ldi		R16,1					; SW 상태 <- 1
+	sts		S_SW_STATUS_13,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_13,R16
+;
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note on message
+	rcall	PUSH_MIDI_MSGQ
+	ldi	R16,0x37					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	ldi		R16,0b01111111			; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'1'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'3'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'#'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_13_END				; 끝
+
+; 끝 마무리
+PROC_13_END:
+	ldi		ZH,HIGH(PROC_15)		; 다음 갈 인터럽트 위치
+	ldi		ZL,LOW(PROC_15)
+	ret
+
+;=============================
+; SW15 처리(그룹 1, 스위치 5) ;초갈   
+;=============================
+PROC_15:
+	lds		R16,S_SW_STATUS_15		; SW 상태변수
+	tst		R16
+	breq	PROC_15_0				; = 0? - Yes
+	cpi		R16,1
+	breq	PROC_15_1				; = 1? - Yes
+	cpi		R16,2
+	breq	PROC_15_2				; = 2? - Yes
+; 상태 3 처리
+	lds		R16,S_SW_COUNT_15		; SW카운터
+	dec		R16						; --
+	sts		S_SW_COUNT_15,R16
+	brne	PROC_15_END2			;  No
+	ldi		R16,0					; SW상태 <- 0
+	sts		S_SW_STATUS_15,R16
+	rjmp	PROC_15_END				; 끝
+; 상태 2 처리
+PROC_15_2:
+	ldi		R16,0b00000010			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,5					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	breq 	PROC_15_END2			; 계속 눌려 있다면 끝
+;#####################
+
+	ldi		R16,3					; SW 상태 <- 3
+	sts		S_SW_STATUS_15,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_15,R16
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note off message
+	rcall	PUSH_MIDI_MSGQ
+	ldi	R16,0x38					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	clr		R16						; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'1'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'5'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'*'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_15_END				; 끝
+;
+; 임시 점프
+PROC_15_END2:
+	rjmp	PROC_15_END
+;--------------------------------
+; 상태 1 처리
+PROC_15_1:
+	lds		R16,S_SW_COUNT_15		; SW카운터
+	dec		R16						; --
+	sts		S_SW_COUNT_15,R16
+	brne	PROC_13_END				;  No
+	ldi		R16,2					; SW상태 <- 2
+	sts		S_SW_STATUS_15,R16
+	rjmp	PROC_15_END				; 끝
+; 상태 0 처리
+PROC_15_0:
+	ldi		R16,0b00000010			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,5					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	brne 	PROC_15_END2			; 안눌렸다면 끝
+;#####################
+
+	ldi		R16,1					; SW 상태 <- 1
+	sts		S_SW_STATUS_15,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_15,R16
+;
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note on message
+	rcall	PUSH_MIDI_MSGQ
+	ldi	R16,0x38					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	ldi		R16,0b01111111			; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'1'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'5'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'#'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_15_END				; 끝
+
+; 끝 마무리
+PROC_15_END:
+	ldi		ZH,HIGH(PROC_16)		; 다음 갈 인터럽트 위치
+	ldi		ZL,LOW(PROC_16)
+	ret
+;=============================
+; SW16 처리(그룹 1, 스위치 6) ;초검    
+;=============================
+PROC_16:
+	lds		R16,S_SW_STATUS_16		; SW 상태변수
+	tst		R16
+	breq	PROC_16_0				; = 0? - Yes
+	cpi		R16,1
+	breq	PROC_16_1				; = 1? - Yes
+	cpi		R16,2
+	breq	PROC_16_2				; = 2? - Yes
+; 상태 3 처리
+	lds		R16,S_SW_COUNT_16		; SW카운터
+	dec		R16						; --
+	sts		S_SW_COUNT_16,R16
+	brne	PROC_16_END2			;  No
+	ldi		R16,0					; SW상태 <- 0
+	sts		S_SW_STATUS_16,R16
+	rjmp	PROC_16_END				; 끝
+; 상태 2 처리
+PROC_16_2:
+	ldi		R16,0b00000010			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,6					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	breq 	PROC_16_END2			; 계속 눌려 있다면 끝
+;#####################
+
+	ldi		R16,3					; SW 상태 <- 3
+	sts		S_SW_STATUS_16,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_16,R16
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note off message
+	rcall	PUSH_MIDI_MSGQ
+	ldi	R16,0x36					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	clr		R16						; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'1'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'6'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'*'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_16_END				; 끝
+;
+; 임시 점프
+PROC_16_END2:
+	rjmp	PROC_16_END
+;--------------------------------
+; 상태 1 처리
+PROC_16_1:
+	lds		R16,S_SW_COUNT_16		; SW카운터
+	dec		R16						; --
+	sts		S_SW_COUNT_16,R16
+	brne	PROC_16_END				;  No
+	ldi		R16,2					; SW상태 <- 2
+	sts		S_SW_STATUS_16,R16
+	rjmp	PROC_16_END				; 끝
+; 상태 0 처리
+PROC_16_0:
+	ldi		R16,0b00000010			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,6					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	brne 	PROC_16_END2			; 안눌렸다면 끝
+;#####################
+
+	ldi		R16,1					; SW 상태 <- 1
+	sts		S_SW_STATUS_16,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_16,R16
+;
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note on message
+	rcall	PUSH_MIDI_MSGQ
+	ldi	R16,0x36					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	ldi		R16,0b01111111			; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'1'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'6'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'#'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_16_END				; 끝
+
+; 끝 마무리
+PROC_16_END:
+	ldi		ZH,HIGH(PROC_17)		; 다음 갈 인터럽트 위치
+	ldi		ZL,LOW(PROC_17)
+	ret
+;=============================
+; SW17 처리(그룹 1, 스위치 7) ;초흰     
+;=============================
+PROC_17:
+	lds		R16,S_SW_STATUS_17		; SW 상태변수
+	tst		R16
+	breq	PROC_17_0				; = 0? - Yes
+	cpi		R16,1
+	breq	PROC_17_1				; = 1? - Yes
+	cpi		R16,2
+	breq	PROC_17_2				; = 2? - Yes
+; 상태 3 처리
+	lds		R16,S_SW_COUNT_17		; SW카운터
+	dec		R16						; --
+	sts		S_SW_COUNT_17,R16
+	brne	PROC_17_END2			;  No
+	ldi		R16,0					; SW상태 <- 0
+	sts		S_SW_STATUS_17,R16
+	rjmp	PROC_17_END				; 끝
+; 상태 2 처리
+PROC_17_2:
+	ldi		R16,0b00000010			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,7					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	breq 	PROC_17_END2			; 계속 눌려 있다면 끝
+;#####################
+
+	ldi		R16,3					; SW 상태 <- 3
+	sts		S_SW_STATUS_17,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_17,R16
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note off message
+	rcall	PUSH_MIDI_MSGQ
+	ldi	R16,0x3B					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	clr		R16						; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'1'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'7'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'*'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_17_END				; 끝
+;
+; 임시 점프
+PROC_17_END2:
+	rjmp	PROC_17_END
+;--------------------------------
+; 상태 1 처리
+PROC_17_1:
+	lds		R16,S_SW_COUNT_17		; SW카운터
+	dec		R16						; --
+	sts		S_SW_COUNT_17,R16
+	brne	PROC_16_END				;  No
+	ldi		R16,2					; SW상태 <- 2
+	sts		S_SW_STATUS_17,R16
+	rjmp	PROC_17_END				; 끝
+; 상태 0 처리
+PROC_17_0:
+	ldi		R16,0b00000010			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,7					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	brne 	PROC_17_END2			; 안눌렸다면 끝
+;#####################
+
+	ldi		R16,1					; SW 상태 <- 1
+	sts		S_SW_STATUS_17,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_17,R16
+;
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note on message
+	rcall	PUSH_MIDI_MSGQ
+	ldi	R16,0x3B					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	ldi		R16,0b01111111			; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'1'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'7'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'#'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_17_END				; 끝
+
+; 끝 마무리
+PROC_17_END:
+	ldi		ZH,HIGH(PROC_20)		; 다음 갈 인터럽트 위치
+	ldi		ZL,LOW(PROC_20)
+	ret
+;=============================
+; SW20 처리(그룹 2, 스위치 0) ;파빨      
+;=============================
+PROC_20:
+	lds		R16,S_SW_STATUS_20		; SW 상태변수
+	tst		R16
+	breq	PROC_20_0				; = 0? - Yes
+	cpi		R16,1
+	breq	PROC_20_1				; = 1? - Yes
+	cpi		R16,2
+	breq	PROC_20_2				; = 2? - Yes
+; 상태 3 처리
+	lds		R16,S_SW_COUNT_20		; SW카운터
+	dec		R16						; --
+	sts		S_SW_COUNT_20,R16
+	brne	PROC_20_END2			;  No
+	ldi		R16,0					; SW상태 <- 0
+	sts		S_SW_STATUS_20,R16
+	rjmp	PROC_20_END				; 끝
+; 상태 2 처리
+PROC_20_2:
+	ldi		R16,0b00000100			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,0					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	breq 	PROC_20_END2			; 계속 눌려 있다면 끝
+;#####################
+
+	ldi		R16,3					; SW 상태 <- 3
+	sts		S_SW_STATUS_20,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_20,R16
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note off message
+	rcall	PUSH_MIDI_MSGQ
+	ldi	R16,0x41					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	clr		R16						; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'2'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'0'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'*'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_20_END				; 끝
+;
+; 임시 점프
+PROC_20_END2:
+	rjmp	PROC_20_END
+;--------------------------------
+; 상태 1 처리
+PROC_20_1:
+	lds		R16,S_SW_COUNT_20		; SW카운터
+	dec		R16						; --
+	sts		S_SW_COUNT_20,R16
+	brne	PROC_20_END				;  No
+	ldi		R16,2					; SW상태 <- 2
+	sts		S_SW_STATUS_20,R16
+	rjmp	PROC_20_END				; 끝
+; 상태 0 처리
+PROC_20_0:
+	ldi		R16,0b00000100			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,0					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	brne 	PROC_20_END2			; 안눌렸다면 끝
+;#####################
+
+	ldi		R16,1					; SW 상태 <- 1
+	sts		S_SW_STATUS_20,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_20,R16
+;
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note on message
+	rcall	PUSH_MIDI_MSGQ
+	ldi	R16,0x41					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	ldi		R16,0b01111111			; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'2'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'0'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'#'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_20_END				; 끝
+
+; 끝 마무리
+PROC_20_END:
+	ldi		ZH,HIGH(PROC_21)		; 다음 갈 인터럽트 위치
+	ldi		ZL,LOW(PROC_21)
+	ret
+SUB_NOP:
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	ret
+;=============================
+; SW21 처리(그룹 2, 스위치 1) ;파주       
+;=============================
+PROC_21:
+	lds		R16,S_SW_STATUS_21		; SW 상태변수
+	tst		R16
+	breq	PROC_21_0				; = 0? - Yes
+	cpi		R16,1
+	breq	PROC_21_1				; = 1? - Yes
+	cpi		R16,2
+	breq	PROC_21_2				; = 2? - Yes
+; 상태 3 처리
+	lds		R16,S_SW_COUNT_21		; SW카운터
+	dec		R16						; --
+	sts		S_SW_COUNT_21,R16
+	brne	PROC_21_END2			;  No
+	ldi		R16,0					; SW상태 <- 0
+	sts		S_SW_STATUS_21,R16
+	rjmp	PROC_21_END				; 끝
+; 상태 2 처리
+PROC_21_2:
+	ldi		R16,0b00000100			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,1					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	breq 	PROC_21_END2			; 계속 눌려 있다면 끝
+;#####################
+
+	ldi		R16,3					; SW 상태 <- 3
+	sts		S_SW_STATUS_21,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_21,R16
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note off message
+	rcall	PUSH_MIDI_MSGQ
+	ldi	R16,0x42					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	clr		R16						; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'2'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'1'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'*'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_21_END				; 끝
+;
+; 임시 점프
+PROC_21_END2:
+	rjmp	PROC_21_END
+;--------------------------------
+; 상태 1 처리
+PROC_21_1:
+	lds		R16,S_SW_COUNT_21		; SW카운터
+	dec		R16						; --
+	sts		S_SW_COUNT_21,R16
+	brne	PROC_21_END				;  No
+	ldi		R16,2					; SW상태 <- 2
+	sts		S_SW_STATUS_21,R16
+	rjmp	PROC_21_END				; 끝
+; 상태 0 처리
+PROC_21_0:
+	ldi		R16,0b00000100			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,1					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	brne 	PROC_21_END2			; 안눌렸다면 끝
+;#####################
+
+	ldi		R16,1					; SW 상태 <- 1
+	sts		S_SW_STATUS_21,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_21,R16
+;
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note on message
+	rcall	PUSH_MIDI_MSGQ
+	ldi	R16,0x42					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	ldi		R16,0b01111111			; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'2'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'1'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'#'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_21_END				; 끝
+
+; 끝 마무리
+PROC_21_END:
+	ldi		ZH,HIGH(PROC_22)		; 다음 갈 인터럽트 위치
+	ldi		ZL,LOW(PROC_22)
+	ret
+
+;------------------------------------------------------------------------------------------------------------------
+USART:
+	rjmp	USART0_1
+SEND_COM_MSG:
+	rjmp	SEND_COM_MSG_1
+SEND_MIDI_MSG:
+	rjmp	SEND_MIDI_MSG_1
+PUSH_COM_MSGQ:
+	rjmp	PUSH_COM_MSGQ_1
+PUSH_MIDI_MSGQ:
+	rjmp	PUSH_MIDI_MSGQ_1
+
+;------------------------------------------------------------------------------------------------------------------
+
+;=============================
+; SW22 처리(그룹 2, 스위치 2) ;파노        
+;=============================
+PROC_22:
+	lds		R16,S_SW_STATUS_22		; SW 상태변수
+	tst		R16
+	breq	PROC_22_0				; = 0? - Yes
+	cpi		R16,1
+	breq	PROC_22_1				; = 1? - Yes
+	cpi		R16,2
+	breq	PROC_22_2				; = 2? - Yes
+; 상태 3 처리
+	lds		R16,S_SW_COUNT_22		; SW카운터
+	dec		R16						; --
+	sts		S_SW_COUNT_22,R16
+	brne	PROC_22_END2			;  No
+	ldi		R16,0					; SW상태 <- 0
+	sts		S_SW_STATUS_22,R16
+	rjmp	PROC_22_END				; 끝
+; 상태 2 처리
+PROC_22_2:
+	ldi		R16,0b00000100			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,2					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	breq 	PROC_22_END2			; 계속 눌려 있다면 끝
+;#####################
+
+	ldi		R16,3					; SW 상태 <- 3
+	sts		S_SW_STATUS_22,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_22,R16
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note off message
+	rcall	PUSH_MIDI_MSGQ
+	ldi		R16,0x3D					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	clr		R16						; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'2'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'2'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'*'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_22_END				; 끝
+;
+; 임시 점프
+PROC_22_END2:
+	rjmp	PROC_22_END
+;--------------------------------
+; 상태 1 처리
+PROC_22_1:
+	lds		R16,S_SW_COUNT_22		; SW카운터
+	dec		R16						; --
+	sts		S_SW_COUNT_22,R16
+	brne	PROC_22_END				;  No
+	ldi		R16,2					; SW상태 <- 2
+	sts		S_SW_STATUS_22,R16
+	rjmp	PROC_22_END				; 끝
+; 상태 0 처리
+PROC_22_0:
+	ldi		R16,0b00000100			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,2					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	brne 	PROC_22_END2			; 안눌렸다면 끝
+;#####################
+
+	ldi		R16,1					; SW 상태 <- 1
+	sts		S_SW_STATUS_22,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_22,R16
+;
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note on message
+	rcall	PUSH_MIDI_MSGQ
+	ldi	R16,0x3D					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	ldi		R16,0b01111111			; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'2'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'2'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'#'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_22_END				; 끝
+
+; 끝 마무리
+PROC_22_END:
+	ldi		ZH,HIGH(PROC_23)		; 다음 갈 인터럽트 위치
+	ldi		ZL,LOW(PROC_23)
+	ret
+;=============================
+; SW23 처리(그룹 2, 스위치 3) ;파초         
+;=============================
+PROC_23:
+	lds		R16,S_SW_STATUS_23		; SW 상태변수
+	tst		R16
+	breq	PROC_23_0				; = 0? - Yes
+	cpi		R16,1
+	breq	PROC_23_1				; = 1? - Yes
+	cpi		R16,2
+	breq	PROC_23_2				; = 2? - Yes
+; 상태 3 처리
+	lds		R16,S_SW_COUNT_23		; SW카운터
+	dec		R16						; --
+	sts		S_SW_COUNT_23,R16
+	brne	PROC_23_END2			;  No
+	ldi		R16,0					; SW상태 <- 0
+	sts		S_SW_STATUS_23,R16
+	rjmp	PROC_23_END				; 끝
+; 상태 2 처리
+PROC_23_2:
+	ldi		R16,0b00000100			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,3					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	breq 	PROC_23_END2			; 계속 눌려 있다면 끝
+;#####################
+
+	ldi		R16,3					; SW 상태 <- 3
+	sts		S_SW_STATUS_23,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_23,R16
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note off message
+	rcall	PUSH_MIDI_MSGQ
+	ldi	R16,0x3F					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	clr		R16						; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'2'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'3'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'*'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_23_END				; 끝
+;
+; 임시 점프
+PROC_23_END2:
+	rjmp	PROC_23_END
+;--------------------------------
+; 상태 1 처리
+PROC_23_1:
+	lds		R16,S_SW_COUNT_23		; SW카운터
+	dec		R16						; --
+	sts		S_SW_COUNT_23,R16
+	brne	PROC_23_END				;  No
+	ldi		R16,2					; SW상태 <- 2
+	sts		S_SW_STATUS_23,R16
+	rjmp	PROC_23_END				; 끝
+; 상태 0 처리
+PROC_23_0:
+	ldi		R16,0b00000100			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,3					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	brne 	PROC_23_END2			; 안눌렸다면 끝
+;#####################
+
+	ldi		R16,1					; SW 상태 <- 1
+	sts		S_SW_STATUS_23,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_23,R16
+;
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note on message
+	rcall	PUSH_MIDI_MSGQ
+	ldi	R16,0x3F					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	ldi		R16,0b01111111			; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'2'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'3'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'#'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_23_END				; 끝
+
+; 끝 마무리
+PROC_23_END:
+	ldi		ZH,HIGH(PROC_24)		; 다음 갈 인터럽트 위치
+	ldi		ZL,LOW(PROC_24)
+	ret
+;=============================
+; SW24 처리(그룹 2, 스위치 4) ;파파          
+;=============================
+PROC_24:
+	lds		R16,S_SW_STATUS_24		; SW 상태변수
+	tst		R16
+	breq	PROC_24_0				; = 0? - Yes
+	cpi		R16,1
+	breq	PROC_24_1				; = 1? - Yes
+	cpi		R16,2
+	breq	PROC_24_2				; = 2? - Yes
+; 상태 3 처리
+	lds		R16,S_SW_COUNT_24		; SW카운터
+	dec		R16						; --
+	sts		S_SW_COUNT_24,R16
+	brne	PROC_24_END2			;  No
+	ldi		R16,0					; SW상태 <- 0
+	sts		S_SW_STATUS_24,R16
+	rjmp	PROC_24_END				; 끝
+; 상태 2 처리
+PROC_24_2:
+	ldi		R16,0b00000100			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,4					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	breq 	PROC_24_END2			; 계속 눌려 있다면 끝
+;#####################
+
+	ldi		R16,3					; SW 상태 <- 3
+	sts		S_SW_STATUS_24,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_24,R16
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note off message
+	rcall	PUSH_MIDI_MSGQ
+	ldi		R16,0x3c				; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	clr		R16						; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'2'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'4'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'*'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_24_END				; 끝
+;
+; 임시 점프
+PROC_24_END2:
+	rjmp	PROC_24_END
+;--------------------------------
+; 상태 1 처리
+PROC_24_1:
+	lds		R16,S_SW_COUNT_24		; SW카운터
+	dec		R16						; --
+	sts		S_SW_COUNT_24,R16
+	brne	PROC_24_END				;  No
+	ldi		R16,2					; SW상태 <- 2
+	sts		S_SW_STATUS_24,R16
+	rjmp	PROC_24_END				; 끝
+; 상태 0 처리
+PROC_24_0:
+	ldi		R16,0b00000100			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,4					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	brne 	PROC_24_END2			; 안눌렸다면 끝
+;#####################
+
+	ldi		R16,1					; SW 상태 <- 1
+	sts		S_SW_STATUS_24,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_24,R16
+;
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note on message
+	rcall	PUSH_MIDI_MSGQ
+	ldi		R16,0x3C					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	ldi		R16,0b01111111			; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'2'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'4'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'#'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_24_END				; 끝
+
+; 끝 마무리
+PROC_24_END:
+	ldi		ZH,HIGH(PROC_25)		; 다음 갈 인터럽트 위치
+	ldi		ZL,LOW(PROC_25)
+	ret
+;=============================
+; SW25 처리(그룹 2, 스위치 5) ;파갈           
+;=============================
+PROC_25:
+	lds		R16,S_SW_STATUS_25		; SW 상태변수
+	tst		R16
+	breq	PROC_25_0				; = 0? - Yes
+	cpi		R16,1
+	breq	PROC_25_1				; = 1? - Yes
+	cpi		R16,2
+	breq	PROC_25_2				; = 2? - Yes
+; 상태 3 처리
+	lds		R16,S_SW_COUNT_25		; SW카운터
+	dec		R16						; --
+	sts		S_SW_COUNT_25,R16
+	brne	PROC_25_END2			;  No
+	ldi		R16,0					; SW상태 <- 0
+	sts		S_SW_STATUS_25,R16
+	rjmp	PROC_25_END				; 끝
+; 상태 2 처리
+PROC_25_2:
+	ldi		R16,0b00000100			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,5					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	breq 	PROC_25_END2			; 계속 눌려 있다면 끝
+;#####################
+
+	ldi		R16,3					; SW 상태 <- 3
+	sts		S_SW_STATUS_25,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_25,R16
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note off message
+	rcall	PUSH_MIDI_MSGQ
+	ldi	R16,0x40					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	clr		R16						; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'2'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'5'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'*'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_25_END				; 끝
+;
+; 임시 점프
+PROC_25_END2:
+	rjmp	PROC_25_END
+;--------------------------------
+; 상태 1 처리
+PROC_25_1:
+	lds		R16,S_SW_COUNT_25		; SW카운터
+	dec		R16						; --
+	sts		S_SW_COUNT_25,R16
+	brne	PROC_25_END				;  No
+	ldi		R16,2					; SW상태 <- 2
+	sts		S_SW_STATUS_25,R16
+	rjmp	PROC_25_END				; 끝
+; 상태 0 처리
+PROC_25_0:
+	ldi		R16,0b00000100			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,5					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	brne 	PROC_25_END2			; 안눌렸다면 끝
+;#####################
+
+	ldi		R16,1					; SW 상태 <- 1
+	sts		S_SW_STATUS_25,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_25,R16
+;
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note on message
+	rcall	PUSH_MIDI_MSGQ
+	ldi	R16,0x40					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	ldi		R16,0b01111111			; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'2'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'5'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'#'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_25_END				; 끝
+
+; 끝 마무리
+PROC_25_END:
+	ldi		ZH,HIGH(PROC_26)		; 다음 갈 인터럽트 위치
+	ldi		ZL,LOW(PROC_26)
+	ret
+;=============================
+; SW26 처리(그룹 2, 스위치 6) ;파검            
+;=============================
+PROC_26:
+	lds		R16,S_SW_STATUS_26		; SW 상태변수
+	tst		R16
+	breq	PROC_26_0				; = 0? - Yes
+	cpi		R16,1
+	breq	PROC_26_1				; = 1? - Yes
+	cpi		R16,2
+	breq	PROC_26_2				; = 2? - Yes
+; 상태 3 처리
+	lds		R16,S_SW_COUNT_26		; SW카운터
+	dec		R16						; --
+	sts		S_SW_COUNT_26,R16
+	brne	PROC_26_END2			;  No
+	ldi		R16,0					; SW상태 <- 0
+	sts		S_SW_STATUS_26,R16
+	rjmp	PROC_26_END				; 끝
+; 상태 2 처리
+PROC_26_2:
+	ldi		R16,0b00000100			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,6					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	breq 	PROC_26_END2			; 계속 눌려 있다면 끝
+;#####################
+
+	ldi		R16,3					; SW 상태 <- 3
+	sts		S_SW_STATUS_26,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_26,R16
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note off message
+	rcall	PUSH_MIDI_MSGQ
+	ldi	R16,0x3E					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	clr		R16						; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'2'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'6'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'*'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_26_END				; 끝
+;
+; 임시 점프
+PROC_26_END2:
+	rjmp	PROC_26_END
+;--------------------------------
+; 상태 1 처리
+PROC_26_1:
+	lds		R16,S_SW_COUNT_26		; SW카운터
+	dec		R16						; --
+	sts		S_SW_COUNT_26,R16
+	brne	PROC_26_END				;  No
+	ldi		R16,2					; SW상태 <- 2
+	sts		S_SW_STATUS_26,R16
+	rjmp	PROC_26_END				; 끝
+; 상태 0 처리
+PROC_26_0:
+	ldi		R16,0b00000100			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,6					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	brne 	PROC_26_END2			; 안눌렸다면 끝
+;#####################
+
+	ldi		R16,1					; SW 상태 <- 1
+	sts		S_SW_STATUS_26,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_26,R16
+;
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note on message
+	rcall	PUSH_MIDI_MSGQ
+	ldi		R16,0x3E					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	ldi		R16,0b01111111			; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'2'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'6'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'#'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_26_END				; 끝
+
+; 끝 마무리
+PROC_26_END:
+	ldi		ZH,HIGH(PROC_27)		; 다음 갈 인터럽트 위치
+	ldi		ZL,LOW(PROC_27)
+	ret
+;=============================
+; SW27 처리(그룹 2, 스위치 7) ;파흰             
+;=============================
+PROC_27:
+	lds		R16,S_SW_STATUS_27		; SW 상태변수
+	tst		R16
+	breq	PROC_27_0				; = 0? - Yes
+	cpi		R16,1
+	breq	PROC_27_1				; = 1? - Yes
+	cpi		R16,2
+	breq	PROC_27_2				; = 2? - Yes
+; 상태 3 처리
+	lds		R16,S_SW_COUNT_27		; SW카운터
+	dec		R16						; --
+	sts		S_SW_COUNT_27,R16
+	brne	PROC_27_END2			;  No
+	ldi		R16,0					; SW상태 <- 0
+	sts		S_SW_STATUS_27,R16
+	rjmp	PROC_27_END				; 끝
+; 상태 2 처리
+PROC_27_2:
+	ldi		R16,0b00000100			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,7					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	breq 	PROC_27_END2			; 계속 눌려 있다면 끝
+;#####################
+
+	ldi		R16,3					; SW 상태 <- 3
+	sts		S_SW_STATUS_27,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_27,R16
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note off message
+	rcall	PUSH_MIDI_MSGQ
+	ldi	R16,0x43					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	clr		R16						; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'2'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'7'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'*'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_27_END				; 끝
+;
+; 임시 점프
+PROC_27_END2:
+	rjmp	PROC_27_END
+;--------------------------------
+; 상태 1 처리
+PROC_27_1:
+	lds		R16,S_SW_COUNT_27		; SW카운터
+	dec		R16						; --
+	sts		S_SW_COUNT_27,R16
+	brne	PROC_27_END				;  No
+	ldi		R16,2					; SW상태 <- 2
+	sts		S_SW_STATUS_27,R16
+	rjmp	PROC_27_END				; 끝
+; 상태 0 처리
+PROC_27_0:
+	ldi		R16,0b00000100			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,7					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	brne 	PROC_27_END2			; 안눌렸다면 끝
+;#####################
+
+	ldi		R16,1					; SW 상태 <- 1
+	sts		S_SW_STATUS_27,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_27,R16
+;
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note on message
+	rcall	PUSH_MIDI_MSGQ
+	ldi	R16,0x43					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	ldi		R16,0b01111111			; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'2'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'7'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'#'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_27_END				; 끝
+
+; 끝 마무리
+PROC_27_END:
+	ldi		ZH,HIGH(PROC_34)		; 다음 갈 인터럽트 위치
+	ldi		ZL,LOW(PROC_34)
+	ret
+;=============================
+; SW34 처리(그룹 3, 스위치 4) ;흰파             
+;=============================
+PROC_34:
+	lds		R16,S_SW_STATUS_34		; SW 상태변수
+	tst		R16
+	breq	PROC_34_0				; = 0? - Yes
+	cpi		R16,1
+	breq	PROC_34_1				; = 1? - Yes
+	cpi		R16,2
+	breq	PROC_34_2				; = 2? - Yes
+; 상태 3 처리
+	lds		R16,S_SW_COUNT_34		; SW카운터
+	dec		R16						; --
+	sts		S_SW_COUNT_34,R16
+	brne	PROC_34_END2			;  No
+	ldi		R16,0					; SW상태 <- 0
+	sts		S_SW_STATUS_34,R16
+	rjmp	PROC_34_END				; 끝
+; 상태 2 처리
+PROC_34_2:
+	ldi		R16,0b00001000			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,4					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	breq 	PROC_34_END2			; 계속 눌려 있다면 끝
+;#####################
+
+	ldi		R16,3					; SW 상태 <- 3
+	sts		S_SW_STATUS_34,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_34,R16
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note off message
+	rcall	PUSH_MIDI_MSGQ
+	ldi	R16,0x54					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	clr		R16						; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'3'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'4'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'*'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_34_END				; 끝
+;
+; 임시 점프
+PROC_34_END2:
+	rjmp	PROC_34_END
+;--------------------------------
+; 상태 1 처리
+PROC_34_1:
+	lds		R16,S_SW_COUNT_34		; SW카운터
+	dec		R16						; --
+	sts		S_SW_COUNT_34,R16
+	brne	PROC_34_END				;  No
+	ldi		R16,2					; SW상태 <- 2
+	sts		S_SW_STATUS_34,R16
+	rjmp	PROC_34_END				; 끝
+; 상태 0 처리
+PROC_34_0:
+	ldi		R16,0b00001000			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,4					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	brne 	PROC_34_END2			; 안눌렸다면 끝
+;#####################
+
+	ldi		R16,1					; SW 상태 <- 1
+	sts		S_SW_STATUS_34,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_34,R16
+;
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note on message
+	rcall	PUSH_MIDI_MSGQ
+	ldi	R16,0x54					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	ldi		R16,0b01111111			; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'3'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'4'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'#'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_34_END				; 끝
+
+; 끝 마무리
+PROC_34_END:
+	ldi		ZH,HIGH(PROC_40)		; 다음 갈 인터럽트 위치
+	ldi		ZL,LOW(PROC_40)
+	ret
+;=============================
+; SW40 처리(그룹 4, 스위치 0) ;노빨              
+;=============================
+PROC_40:
+	lds		R16,S_SW_STATUS_40		; SW 상태변수
+	tst		R16
+	breq	PROC_40_0				; = 0? - Yes
+	cpi		R16,1
+	breq	PROC_40_1				; = 1? - Yes
+	cpi		R16,2
+	breq	PROC_40_2				; = 2? - Yes
+; 상태 3 처리
+	lds		R16,S_SW_COUNT_40		; SW카운터
+	dec		R16						; --
+	sts		S_SW_COUNT_40,R16
+	brne	PROC_40_END2			;  No
+	ldi		R16,0					; SW상태 <- 0
+	sts		S_SW_STATUS_40,R16
+	rjmp	PROC_40_END				; 끝
+; 상태 2 처리
+PROC_40_2:
+	ldi		R16,0b00010000			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,0					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	breq 	PROC_40_END2			; 계속 눌려 있다면 끝
+;#####################
+
+	ldi		R16,3					; SW 상태 <- 3
+	sts		S_SW_STATUS_40,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_40,R16
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note off message
+	rcall	PUSH_MIDI_MSGQ
+	ldi	R16,0x49					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	clr		R16						; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'4'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'0'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'*'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_40_END				; 끝
+;
+; 임시 점프
+PROC_40_END2:
+	rjmp	PROC_40_END
+;--------------------------------
+; 상태 1 처리
+PROC_40_1:
+	lds		R16,S_SW_COUNT_40		; SW카운터
+	dec		R16						; --
+	sts		S_SW_COUNT_40,R16
+	brne	PROC_40_END				;  No
+	ldi		R16,2					; SW상태 <- 2
+	sts		S_SW_STATUS_40,R16
+	rjmp	PROC_40_END				; 끝
+; 상태 0 처리
+PROC_40_0:
+	ldi		R16,0b00010000			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,0					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	brne 	PROC_40_END2			; 안눌렸다면 끝
+;#####################
+
+	ldi		R16,1					; SW 상태 <- 1
+	sts		S_SW_STATUS_40,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_40,R16
+;
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note on message
+	rcall	PUSH_MIDI_MSGQ
+	ldi	R16,0x49					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	ldi		R16,0b01111111			; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'4'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'0'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'#'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_40_END				; 끝
+
+; 끝 마무리
+PROC_40_END:
+	ldi		ZH,HIGH(PROC_41)		; 다음 갈 인터럽트 위치
+	ldi		ZL,LOW(PROC_41)
+	ret
+;=============================
+; SW41 처리(그룹 4, 스위치 1) ;노주               
+;=============================
+PROC_41:
+	lds		R16,S_SW_STATUS_41		; SW 상태변수
+	tst		R16
+	breq	PROC_41_0				; = 0? - Yes
+	cpi		R16,1
+	breq	PROC_41_1				; = 1? - Yes
+	cpi		R16,2
+	breq	PROC_41_2				; = 2? - Yes
+; 상태 3 처리
+	lds		R16,S_SW_COUNT_41		; SW카운터
+	dec		R16						; --
+	sts		S_SW_COUNT_41,R16
+	brne	PROC_41_END2			;  No
+	ldi		R16,0					; SW상태 <- 0
+	sts		S_SW_STATUS_41,R16
+	rjmp	PROC_41_END				; 끝
+; 상태 2 처리
+PROC_41_2:
+	ldi		R16,0b00010000			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,1					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	breq 	PROC_41_END2			; 계속 눌려 있다면 끝
+;#####################
+
+	ldi		R16,3					; SW 상태 <- 3
+	sts		S_SW_STATUS_41,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_41,R16
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note off message
+	rcall	PUSH_MIDI_MSGQ
+	ldi		R16,0x4A					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	clr		R16						; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'4'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'1'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'*'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_41_END				; 끝
+;
+; 임시 점프
+PROC_41_END2:
+	rjmp	PROC_41_END
+;--------------------------------
+; 상태 1 처리
+PROC_41_1:
+	lds		R16,S_SW_COUNT_41		; SW카운터
+	dec		R16						; --
+	sts		S_SW_COUNT_41,R16
+	brne	PROC_41_END				;  No
+	ldi		R16,2					; SW상태 <- 2
+	sts		S_SW_STATUS_41,R16
+	rjmp	PROC_41_END				; 끝
+; 상태 0 처리
+PROC_41_0:
+	ldi		R16,0b00010000			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,1					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	brne 	PROC_41_END2			; 안눌렸다면 끝
+;#####################
+
+	ldi		R16,1					; SW 상태 <- 1
+	sts		S_SW_STATUS_41,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_41,R16
+;
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note on message
+	rcall	PUSH_MIDI_MSGQ
+	ldi		R16,0x4A					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	ldi		R16,0b01111111			; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'4'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'1'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'#'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_41_END				; 끝
+
+; 끝 마무리
+PROC_41_END:
+	ldi		ZH,HIGH(PROC_42)		; 다음 갈 인터럽트 위치
+	ldi		ZL,LOW(PROC_42)
+	ret
+;=============================
+; SW42 처리(그룹 4, 스위치 2) ;노노                
+;=============================
+PROC_42:
+	lds		R16,S_SW_STATUS_42		; SW 상태변수
+	tst		R16
+	breq	PROC_42_0				; = 0? - Yes
+	cpi		R16,1
+	breq	PROC_42_1				; = 1? - Yes
+	cpi		R16,2
+	breq	PROC_42_2				; = 2? - Yes
+; 상태 3 처리
+	lds		R16,S_SW_COUNT_42		; SW카운터
+	dec		R16						; --
+	sts		S_SW_COUNT_42,R16
+	brne	PROC_42_END2			;  No
+	ldi		R16,0					; SW상태 <- 0
+	sts		S_SW_STATUS_42,R16
+	rjmp	PROC_42_END				; 끝
+; 상태 2 처리
+PROC_42_2:
+	ldi		R16,0b00010000			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,2					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	breq 	PROC_42_END2			; 계속 눌려 있다면 끝
+;#####################
+
+	ldi		R16,3					; SW 상태 <- 3
+	sts		S_SW_STATUS_42,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_42,R16
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note off message
+	rcall	PUSH_MIDI_MSGQ
+	ldi	R16,0x45					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	clr		R16						; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'4'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'2'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'*'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_42_END				; 끝
+;
+; 임시 점프
+PROC_42_END2:
+	rjmp	PROC_42_END
+;--------------------------------
+; 상태 1 처리
+PROC_42_1:
+	lds		R16,S_SW_COUNT_42		; SW카운터
+	dec		R16						; --
+	sts		S_SW_COUNT_42,R16
+	brne	PROC_42_END				;  No
+	ldi		R16,2					; SW상태 <- 2
+	sts		S_SW_STATUS_42,R16
+	rjmp	PROC_42_END				; 끝
+; 상태 0 처리
+PROC_42_0:
+	ldi		R16,0b00010000			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,2					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	brne 	PROC_42_END2			; 안눌렸다면 끝
+;#####################
+
+	ldi		R16,1					; SW 상태 <- 1
+	sts		S_SW_STATUS_42,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_42,R16
+;
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note on message
+	rcall	PUSH_MIDI_MSGQ
+	ldi	R16,0x45					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	ldi		R16,0b01111111			; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'4'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'2'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'#'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_42_END				; 끝
+
+; 끝 마무리
+PROC_42_END:
+	ldi		ZH,HIGH(PROC_43)		; 다음 갈 인터럽트 위치
+	ldi		ZL,LOW(PROC_43)
+	ret
+;=============================
+; SW43 처리(그룹 4, 스위치 3) ;노초                 
+;=============================
+PROC_43:
+	lds		R16,S_SW_STATUS_43		; SW 상태변수
+	tst		R16
+	breq	PROC_43_0				; = 0? - Yes
+	cpi		R16,1
+	breq	PROC_43_1				; = 1? - Yes
+	cpi		R16,2
+	breq	PROC_43_2				; = 2? - Yes
+; 상태 3 처리
+	lds		R16,S_SW_COUNT_43		; SW카운터
+	dec		R16						; --
+	sts		S_SW_COUNT_43,R16
+	brne	PROC_43_END2			;  No
+	ldi		R16,0					; SW상태 <- 0
+	sts		S_SW_STATUS_43,R16
+	rjmp	PROC_43_END				; 끝
+; 상태 2 처리
+PROC_43_2:
+	ldi		R16,0b00010000			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,3					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	breq 	PROC_43_END2			; 계속 눌려 있다면 끝
+;#####################
+
+	ldi		R16,3					; SW 상태 <- 3
+	sts		S_SW_STATUS_43,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_43,R16
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note off message
+	rcall	PUSH_MIDI_MSGQ
+	ldi	R16,0x47					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	clr		R16						; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'4'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'3'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'*'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_43_END				; 끝
+;
+; 임시 점프
+PROC_43_END2:
+	rjmp	PROC_43_END
+;--------------------------------
+; 상태 1 처리
+PROC_43_1:
+	lds		R16,S_SW_COUNT_43		; SW카운터
+	dec		R16						; --
+	sts		S_SW_COUNT_43,R16
+	brne	PROC_43_END				;  No
+	ldi		R16,2					; SW상태 <- 2
+	sts		S_SW_STATUS_43,R16
+	rjmp	PROC_43_END				; 끝
+; 상태 0 처리
+PROC_43_0:
+	ldi		R16,0b00010000			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,3					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	brne 	PROC_43_END2			; 안눌렸다면 끝
+;#####################
+
+	ldi		R16,1					; SW 상태 <- 1
+	sts		S_SW_STATUS_43,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_43,R16
+;
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note on message
+	rcall	PUSH_MIDI_MSGQ
+	ldi	R16,0x47					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	ldi		R16,0b01111111			; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'4'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'3'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'#'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_43_END				; 끝
+
+; 끝 마무리
+PROC_43_END:
+	ldi		ZH,HIGH(PROC_44)		; 다음 갈 인터럽트 위치
+	ldi		ZL,LOW(PROC_44)
+	ret
+;=============================
+; SW44 처리(그룹 4, 스위치 4) ;노파                  
+;=============================
+PROC_44:
+	lds		R16,S_SW_STATUS_44		; SW 상태변수
+	tst		R16
+	breq	PROC_44_0				; = 0? - Yes
+	cpi		R16,1
+	breq	PROC_44_1				; = 1? - Yes
+	cpi		R16,2
+	breq	PROC_44_2				; = 2? - Yes
+; 상태 3 처리
+	lds		R16,S_SW_COUNT_44		; SW카운터
+	dec		R16						; --
+	sts		S_SW_COUNT_44,R16
+	brne	PROC_44_END2			;  No
+	ldi		R16,0					; SW상태 <- 0
+	sts		S_SW_STATUS_44,R16
+	rjmp	PROC_44_END				; 끝
+; 상태 2 처리
+PROC_44_2:
+	ldi		R16,0b00010000			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,4					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	breq 	PROC_44_END2			; 계속 눌려 있다면 끝
+;#####################
+
+	ldi		R16,3					; SW 상태 <- 3
+	sts		S_SW_STATUS_44,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_44,R16
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note off message
+	rcall	PUSH_MIDI_MSGQ
+	ldi	R16,0x44					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	clr		R16						; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'4'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'4'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'*'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_44_END				; 끝
+;
+; 임시 점프
+PROC_44_END2:
+	rjmp	PROC_44_END
+;--------------------------------
+; 상태 1 처리
+PROC_44_1:
+	lds		R16,S_SW_COUNT_44		; SW카운터
+	dec		R16						; --
+	sts		S_SW_COUNT_44,R16
+	brne	PROC_44_END				;  No
+	ldi		R16,2					; SW상태 <- 2
+	sts		S_SW_STATUS_44,R16
+	rjmp	PROC_44_END				; 끝
+; 상태 0 처리
+PROC_44_0:
+	ldi		R16,0b00010000			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,4					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	brne 	PROC_44_END2			; 안눌렸다면 끝
+;#####################
+
+	ldi		R16,1					; SW 상태 <- 1
+	sts		S_SW_STATUS_44,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_44,R16
+;
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note on message
+	rcall	PUSH_MIDI_MSGQ
+	ldi	R16,0x44					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	ldi		R16,0b01111111			; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'4'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'4'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'#'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_44_END				; 끝
+
+; 끝 마무리
+PROC_44_END:
+	ldi		ZH,HIGH(PROC_45)		; 다음 갈 인터럽트 위치
+	ldi		ZL,LOW(PROC_45)
+	ret
+;=============================
+; SW45 처리(그룹 4, 스위치 5) ;노갈                   
+;=============================
+PROC_45:
+	lds		R16,S_SW_STATUS_45		; SW 상태변수
+	tst		R16
+	breq	PROC_45_0				; = 0? - Yes
+	cpi		R16,1
+	breq	PROC_45_1				; = 1? - Yes
+	cpi		R16,2
+	breq	PROC_45_2				; = 2? - Yes
+; 상태 3 처리
+	lds		R16,S_SW_COUNT_45		; SW카운터
+	dec		R16						; --
+	sts		S_SW_COUNT_45,R16
+	brne	PROC_45_END2			;  No
+	ldi		R16,0					; SW상태 <- 0
+	sts		S_SW_STATUS_45,R16
+	rjmp	PROC_45_END				; 끝
+; 상태 2 처리
+PROC_45_2:
+	ldi		R16,0b00010000			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,5					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	breq 	PROC_45_END2			; 계속 눌려 있다면 끝
+;#####################
+
+	ldi		R16,3					; SW 상태 <- 3
+	sts		S_SW_STATUS_45,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_45,R16
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note off message
+	rcall	PUSH_MIDI_MSGQ
+	ldi		R16,0x48					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	clr		R16						; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'4'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'5'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'*'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_45_END				; 끝
+;
+; 임시 점프
+PROC_45_END2:
+	rjmp	PROC_45_END
+;--------------------------------
+; 상태 1 처리
+PROC_45_1:
+	lds		R16,S_SW_COUNT_45		; SW카운터
+	dec		R16						; --
+	sts		S_SW_COUNT_45,R16
+	brne	PROC_45_END				;  No
+	ldi		R16,2					; SW상태 <- 2
+	sts		S_SW_STATUS_45,R16
+	rjmp	PROC_45_END				; 끝
+; 상태 0 처리
+PROC_45_0:
+	ldi		R16,0b00010000			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,5					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	brne 	PROC_45_END2			; 안눌렸다면 끝
+;#####################
+
+	ldi		R16,1					; SW 상태 <- 1
+	sts		S_SW_STATUS_45,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_45,R16
+;
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note on message
+	rcall	PUSH_MIDI_MSGQ
+	ldi		R16,0x48					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	ldi		R16,0b01111111			; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'4'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'5'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'#'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_45_END				; 끝
+
+; 끝 마무리
+PROC_45_END:
+	ldi		ZH,HIGH(PROC_46)		; 다음 갈 인터럽트 위치
+	ldi		ZL,LOW(PROC_46)
+	ret
+;=============================
+; SW46 처리(그룹 4, 스위치 6) ;노검                    
+;=============================
+PROC_46:
+	lds		R16,S_SW_STATUS_46		; SW 상태변수
+	tst		R16
+	breq	PROC_46_0				; = 0? - Yes
+	cpi		R16,1
+	breq	PROC_46_1				; = 1? - Yes
+	cpi		R16,2
+	breq	PROC_46_2				; = 2? - Yes
+; 상태 3 처리
+	lds		R16,S_SW_COUNT_46		; SW카운터
+	dec		R16						; --
+	sts		S_SW_COUNT_46,R16
+	brne	PROC_46_END2			;  No
+	ldi		R16,0					; SW상태 <- 0
+	sts		S_SW_STATUS_46,R16
+	rjmp	PROC_46_END				; 끝
+; 상태 2 처리
+PROC_46_2:
+	ldi		R16,0b00010000			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,6					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	breq 	PROC_46_END2			; 계속 눌려 있다면 끝
+;#####################
+
+	ldi		R16,3					; SW 상태 <- 3
+	sts		S_SW_STATUS_46,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_46,R16
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note off message
+	rcall	PUSH_MIDI_MSGQ
+	ldi	R16,0x46					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	clr		R16						; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'4'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'6'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'*'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_46_END				; 끝
+;
+; 임시 점프
+PROC_46_END2:
+	rjmp	PROC_46_END
+;--------------------------------
+; 상태 1 처리
+PROC_46_1:
+	lds		R16,S_SW_COUNT_46		; SW카운터
+	dec		R16						; --
+	sts		S_SW_COUNT_46,R16
+	brne	PROC_46_END				;  No
+	ldi		R16,2					; SW상태 <- 2
+	sts		S_SW_STATUS_46,R16
+	rjmp	PROC_46_END				; 끝
+; 상태 0 처리
+PROC_46_0:
+	ldi		R16,0b00010000			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,6					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	brne 	PROC_46_END2			; 안눌렸다면 끝
+;#####################
+
+
+	ldi		R16,1					; SW 상태 <- 1
+	sts		S_SW_STATUS_46,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_46,R16
+;
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note on message
+	rcall	PUSH_MIDI_MSGQ
+	ldi	R16,0x46					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	ldi		R16,0b01111111			; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'4'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'6'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'#'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_46_END				; 끝
+
+; 끝 마무리
+PROC_46_END:
+	ldi		ZH,HIGH(PROC_47)		; 다음 갈 인터럽트 위치
+	ldi		ZL,LOW(PROC_47)
+	ret
+;=============================
+; SW47 처리(그룹 4, 스위치 7) ;노검                    
+;=============================
+PROC_47:
+	lds		R16,S_SW_STATUS_47		; SW 상태변수
+	tst		R16
+	breq	PROC_47_0				; = 0? - Yes
+	cpi		R16,1
+	breq	PROC_47_1				; = 1? - Yes
+	cpi		R16,2
+	breq	PROC_47_2				; = 2? - Yes
+; 상태 3 처리
+	lds		R16,S_SW_COUNT_47		; SW카운터
+	dec		R16						; --
+	sts		S_SW_COUNT_47,R16
+	brne	PROC_47_END2			;  No
+	ldi		R16,0					; SW상태 <- 0
+	sts		S_SW_STATUS_47,R16
+	rjmp	PROC_47_END				; 끝
+; 상태 2 처리
+PROC_47_2:
+	ldi		R16,0b00010000			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,7					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	breq 	PROC_47_END2			; 계속 눌려 있다면 끝
+;#####################
+
+
+	ldi		R16,3					; SW 상태 <- 3
+	sts		S_SW_STATUS_47,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_47,R16
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note off message
+	rcall	PUSH_MIDI_MSGQ
+	ldi	R16,0x4B					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	clr		R16						; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'4'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'7'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'*'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_47_END				; 끝
+;
+; 임시 점프
+PROC_47_END2:
+	rjmp	PROC_47_END
+;--------------------------------
+; 상태 1 처리
+PROC_47_1:
+	lds		R16,S_SW_COUNT_47		; SW카운터
+	dec		R16						; --
+	sts		S_SW_COUNT_47,R16
+	brne	PROC_47_END				;  No
+	ldi		R16,2					; SW상태 <- 2
+	sts		S_SW_STATUS_47,R16
+	rjmp	PROC_47_END				; 끝
+; 상태 0 처리
+PROC_47_0:
+	ldi		R16,0b00010000			; <============ 그룹 번호
+	out		I_GROUP,R16
+;	nop
+;	nop
+;	nop
+;#####################
+;	rcall	SUB_NOP
+	ldi		R16,7					; ADC 채널번호(스위치 번호)
+	call	SUB_ADC					; ADC 변환 다녀와
+	tst		R16				
+	brne 	PROC_47_END2			; 안눌렸다면 끝
+;#####################
+
+	ldi		R16,1					; SW 상태 <- 1
+	sts		S_SW_STATUS_47,R16
+	ldi		R16,20					; SW 카운터 <- 20
+	sts		S_SW_COUNT_47,R16
+;
+;------------------------- 요기는 MIDI 메시지
+	ldi		R16,0b10010000			; Note on message
+	rcall	PUSH_MIDI_MSGQ
+	ldi	R16,0x4B					; 음계값
+	rcall	PUSH_MIDI_MSGQ
+	ldi		R16,0b01111111			; Envelop
+	rcall	PUSH_MIDI_MSGQ
+;------------------------- 요기는 콘솔 메시지
+	ldi		R16,'4'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'7'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,'#'
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+	ldi		R16,' '
+	rcall	PUSH_COM_MSGQ			; 콘솔 메시지 큐에 저장
+;-------------------------
+	rjmp	PROC_47_END				; 끝
+
+; 끝 마무리
+PROC_47_END:
+	ldi		ZH,HIGH(PROC_00)		; 다음 갈 인터럽트 위치
+	ldi		ZL,LOW(PROC_00)
+	ret
+;=============================
+; 콘솔 메시지 큐에 넣기
+;=============================
+;      R16 - In
+PUSH_COM_MSGQ_1:
+	lds		YL,S_COM_PUSH_PNTL		; COM PUSH 포인터 가져오기
+	lds		YH,S_COM_PUSH_PNTH
+	st		Y+,R16					; (Push Pointer) <= Message; Push Pointer++
+	inc		R_COM_Q_CNT				; COM_Q 카운터++
+	cpi		YH,HIGH(C_COM_Q_END)	; Push_PNT = C_COM_Q_END? (상위)
+	brne	PUSH_COM_MSGQ_R			;  - No
+	cpi		YL,LOW(C_COM_Q_END)		; Push_PNT = C_COM_Q_END? (하위)
+	brne	PUSH_COM_MSGQ_R			;  - No
+	ldi		YH,HIGH(C_COM_Q_START)	; Push_PNT <= C_COM_Q_START
+	ldi		YL,LOW(C_COM_Q_START)
+PUSH_COM_MSGQ_R:
+	sts		S_COM_PUSH_PNTL,YL		; 포인터 보관
+	sts		S_COM_PUSH_PNTH,YH
+	ret
+;=============================
+; 콘솔 메시지 큐로부터 빼기
+;=============================
+;      R16 - Out
+POP_COM_MSGQ:
+	lds		YL,S_COM_POP_PNTL		; COM POP 포인터 가져오기
+	lds		YH,S_COM_POP_PNTH
+	ld		R16,Y+					; Message <= (Pop Pointer); Pop Pointer++
+	dec		R_COM_Q_CNT				; Q 카운터--
+	cpi		YH,HIGH(C_COM_Q_END)	; Pop_PNT = C_Q_END? (상위)
+	brne	POP_COM_MSGQ_R			;  - No
+	cpi		YL,LOW(C_COM_Q_END)		; Pop_PNT = C_Q_END? (하위)
+	brne	POP_COM_MSGQ_R			;  - No
+	ldi		YH,HIGH(C_COM_Q_START)	; Pop_PNT <= C_Q_START
+	ldi		YL,LOW(C_COM_Q_START)
+POP_COM_MSGQ_R:
+	sts		S_COM_POP_PNTL,YL		; 포인터 보관
+	sts		S_COM_POP_PNTH,YH
+	ret
+;=============================
+; MIDI 큐에 넣기
+;=============================
+;      R16 - In
+PUSH_MIDI_MSGQ_1:
+	lds		YL,S_MIDI_PUSH_PNTL		; COM PUSH 포인터 가져오기
+	lds		YH,S_MIDI_PUSH_PNTH
+	st		Y+,R16					; (Push Pointer) <= Message; Push Pointer++
+	inc		R_MIDI_Q_CNT				; COM_Q 카운터++
+	cpi		YH,HIGH(C_MIDI_Q_END)	; Push_PNT = C_COM_Q_END? (상위)
+	brne	PUSH_MIDI_MSGQ_R			;  - No
+	cpi		YL,LOW(C_MIDI_Q_END)		; Push_PNT = C_COM_Q_END? (하위)
+	brne	PUSH_MIDI_MSGQ_R			;  - No
+	ldi		YH,HIGH(C_MIDI_Q_START)	; Push_PNT <= C_COM_Q_START
+	ldi		YL,LOW(C_MIDI_Q_START)
+PUSH_MIDI_MSGQ_R:
+	sts		S_MIDI_PUSH_PNTL,YL		; 포인터 보관
+	sts		S_MIDI_PUSH_PNTH,YH
+	ret
+;=============================
+; MIDI 큐로부터 빼기
+;=============================
+;      R16 - Out
+POP_MIDI_MSGQ:
+	lds		YL,S_MIDI_POP_PNTL		; COM POP 포인터 가져오기
+	lds		YH,S_MIDI_POP_PNTH
+	ld		R16,Y+					; Message <= (Pop Pointer); Pop Pointer++
+	dec		R_MIDI_Q_CNT				; Q 카운터--
+	cpi		YH,HIGH(C_MIDI_Q_END)	; Pop_PNT = C_Q_END? (상위)
+	brne	POP_MIDI_MSGQ_R			;  - No
+	cpi		YL,LOW(C_MIDI_Q_END)		; Pop_PNT = C_Q_END? (하위)
+	brne	POP_MIDI_MSGQ_R			;  - No
+	ldi		YH,HIGH(C_MIDI_Q_START)	; Pop_PNT <= C_Q_START
+	ldi		YL,LOW(C_MIDI_Q_START)
+POP_MIDI_MSGQ_R:
+	sts		S_MIDI_POP_PNTL,YL		; 포인터 보관
+	sts		S_MIDI_POP_PNTH,YH
+	ret
+;=============================
+; 콘솔 메시지 전송
+;=============================
+;      R16 - 사용
+SEND_COM_MSG_1:
+	tst		R_COM_Q_CNT				; Q 카운터 점검
+	breq	SEND_COM_MSG_R			; 없으면 말고
+	lds		R16,UCSR0A
+	sbrs	R16,5					; UCSRA의 5번비트(UDRE)가 1이면(즉 전송 가능하다면...) SKIP
+	ret								; 전송 중이라면, 다음 기회에...
+	rcall	POP_COM_MSGQ			; 큐에서 가져오기
+	sts		UDR0,R16				; 전송
+SEND_COM_MSG_R:
+	ret
+;=============================
+; MIDI 메시지 전송
+;=============================
+;      R16 - 사용
+SEND_MIDI_MSG_1:
+	tst		R_MIDI_Q_CNT				; Q 카운터 점검
+	breq	SEND_MIDI_MSG_R			; 없으면 말고
+	lds		R16,UCSR1A
+	sbrs	R16,5					; UCSRA의 5번비트(UDRE)가 1이면(즉 전송 가능하다면...) SKIP
+	ret								; 전송 중이라면, 다음 기회에...
+	rcall	POP_MIDI_MSGQ			; 큐에서 가져오기
+	sts		UDR1,R16				; 전송
+
+SEND_MIDI_MSG_R:
+	ret
+;================================================================
+;
+; 2자리 16진수 표시
+; R17 - Input
+;=============================
+SEND2HEX:
+	push	R17						; 일단 보관
+	andi	R17,0b11110000			; 윗자리 추출
+	swap	R17
+	rcall	SEND1HEX
+	pop		R17
+	andi	R17,0b00001111			; 아랫자리 추출
+	rcall	SEND1HEX
+	ret
+;=============================
+; 1자리 16진수 표시
+; R17 - Input
+;=============================
+SEND1HEX:
+	push	R16
+	ldi		R16,'0'					; 일단 '0'자 준비
+	cpi		R17,10
+	brcs	SEND1HEX1				; 10보다 작을 때
+	ldi		R16,'A' - 10			; 'A'자로 교체
+SEND1HEX1:
+	add		R17,R16					; 글자로 결합
+	rcall	USART					; 전송
+	pop		R16
+	ret
+;=============================
+; Send to USART
+; R17 - Input
+;=============================
+USART0_1:								;수신이 준비가 되었는지 확인
+	push	R17
+USART0_2:
+	lds		R17,UCSR0A
+	sbrs 	R17,5					;UCSRA의 5번비트(UDRE)가 1이면 SKIP
+	rjmp	USART0_2
+	pop		R17
+	sts		UDR0,R17				;R17의 데이터를 PC로 보냄
+
+	ret
+;=============================
+; Send to MIDI
+; R17 - Input
+;=============================
+USART1_1:								;수신이 준비가 되었는지 확인
+	push	R17
+USART1_2:
+	lds		R17,UCSR1A
+	sbrs 	R17,5					;UCSRA의 5번비트(UDRE)가 1이면 SKIP
+	rjmp	USART1_2
+	pop		R17
+	sts		UDR1,R17				;R17의 데이터를 PC로 보냄
+
+	ret
+;
+;=============================
+; A/D 변환하기
+;     약 235 ~ 236 근처면 고스트
+;     약 194 이하이면 눌린 것
+;  입력
+;   R16 : 채널#
+;  출력
+;   R16 = 00 - 눌렸음
+;   R16 = FF - 안눌렸음
+;=============================
+SUB_ADC:
+
+	ori		R16,0b01100000			; REFS1,0 = 01 - Vref = AVCC
+									; ADLAR = 1 (상위 8비트만 사용)
+	sts		ADMUX,R16
+
+	ldi		R16,0b11010000			; ADCSRA 설정
+									;   b7 : ADEN = 1(ADC 가동)
+									;   b6 : ADSC = 1(ADC 시작)
+									;   b5 : Auto = 0
+									;   b4,3 : ADC INT = 00
+									;   b2,1,0 : Prescaler = 000(최대속도)
+	sts		ADCSRA,R16
+SUB_ADC_0:
+	lds		R16,ADCSRA				; ADC 끝났는지 감시
+	sbrs	R16,4					; 끝났다면 스킵;ADCSRA의 4번비트가 1이면 skip
+	rjmp	SUB_ADC_0				;안끝났으면 맴맴
+
+	lds		R16,ADCL				; 하위 먼저 읽음
+	lds		R16,ADCH				; 상위 읽음(하위 필요없음)
+
+	cpi		R16,194					;194 경계값 비교
+;	cpi		R16,250					;194 경계값 비교
+	brcc	SUB_ADC_1				; 안눌렸거나 고스트
+	clr		R16						;194와 같거나 작을경우  
+	ret
+SUB_ADC_1:
+	ser		R16						; 안눌린 표시
+    ret
