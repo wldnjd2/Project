@@ -1,27 +1,34 @@
-### **공주대학교 정보통신공학부 졸업**
----
-- 2015년 3월 입학 - 2019년 2월 졸업
+### 기본정보
+- 이름: 김지원
+- 이메일: jeewon3665@gmail.com
+- Tech Blog: https://wldnjd2.github.io/
 
-> C언어 프로그래밍 <br> 
-> JAVA 프로그래밍 <br> 
-> C++ 프로그래밍  <br> 
-> Matlab  <br> 
-> 자료구조 및 알고리즘 <br> 
-> 데이터베이스  <br> 
-> 운영체제 <br> 
-> 영상신호 처리 및 부호화 <br> 
-> 정보보안 <br> 
-> 마이크로프로세서 <br> 
-> 통신이론 <br> 
-> 신호처리 <br> 
-> 기조전자실험 <br> 
-> 전자회로 <br> 
-> 임베디드시스템설계 <br> 
-> PADS (PCB 기판 설계) <br> 
-> 공업수학 <br> 
-> 선형대수 <br> 
-> 컴퓨터통신망 <br> 
- 
+
+### 학력
+- 학교 
+  - 공주대학교 정보통신공학부
+  - 2015년 3월 입학 - 2019년 2월 졸업
+|교육|
+|------|
+|C언어 프로그래밍 | 
+|JAVA 프로그래밍 | 
+|C++ 프로그래밍  | 
+|Matlab  | 
+|자료구조 및 알고리즘 | 
+|데이터베이스  | 
+|운영체제 | 
+|영상신호 처리 및 부호화 | 
+|정보보안 | 
+|마이크로프로세서 | 
+|통신이론 | 
+|신호처리 | 
+|기조전자실험 | 
+|전자회로 | 
+|임베디드시스템설계 | 
+|PADS (PCB 기판 설계) | 
+|공업수학 | 
+|선형대수 | 
+|컴퓨터통신망 | 
 <br> 
 
 ### **졸업작품**
@@ -40,21 +47,15 @@
 
 <br> 
 
-### **자격증**
+### 자격증
 ---
 - 정보처리기사 (2019년 취득)
 - 자동차운전면허증 2종보통 (2019년 취득)
 
-<br> 
-
-### **Tech Blog**
----
-개설일: 21.10.28 ~ <br>
-https://wldnjd2.github.io/
 
 <br>
 
-### **아르바이트**
+### 아르바이트
 ---
 - 수원 롯데몰 빌리엔젤 <br>
   2021/06/14 - 2021/10/29
@@ -82,5 +83,8 @@ https://wldnjd2.github.io/
 - 기간: 2021.11~ (한달)
 - 사용언어: Python 
 - 라이브러리: Plotly
-- [Kaggle 프로젝트 자세히 보기](https://github.com/wldnjd2/Project/tree/main/Project_kaggle)
+- [Kaggle 제출](https://www.kaggle.com/yoonhwayam/newbies-as-a-data-scientist-in-east-asia)
+- [PPT](https://github.com/wldnjd2/Project/blob/main/Project_kaggle/Kaggle%20competition_Newbie%20as%20a%20Data%20Scientist%20in%20East%20Asia.pdf)
+
+
 <br> 
