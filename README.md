@@ -80,9 +80,9 @@
   - 기간: 2021.11~ (한달)
   - 사용언어: Python 
   - 라이브러리: Pandas, Plotly, Numpy, Seaborn, Metplotlib
-- [Kaggle 대회 자세히 보기](https://github.com/wldnjd2/Project/tree/main/Project_kaggle)
-- [Kaggle 제출](https://www.kaggle.com/yoonhwayam/newbies-as-a-data-scientist-in-east-asia)
-- [PPT](https://github.com/wldnjd2/Project/blob/main/Project_kaggle/Kaggle%20competition_Newbie%20as%20a%20Data%20Scientist%20in%20East%20Asia.pdf)
+  - 사용툴: Kaggle notebook
+- [Kaggle 제출 결과물](https://www.kaggle.com/yoonhwayam/newbies-as-a-data-scientist-in-east-asia)
+- [발표자료 PDF](https://github.com/wldnjd2/Project/blob/main/Project_kaggle/Kaggle%20competition_Newbie%20as%20a%20Data%20Scientist%20in%20East%20Asia.pdf)
 
 
 <br> 
