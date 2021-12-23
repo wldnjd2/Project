@@ -55,8 +55,9 @@
 	- [JAVA](https://github.com/wldnjd2/JAVA) <br>
 	- [데이터베이스](https://github.com/wldnjd2/DataBase) <br>
 	- [JSP, Servlet](https://github.com/wldnjd2/JSP-Servlet) <br>
-	- [Python](https://wldnjd2.github.io/categories/%ED%8C%8C%EC%9D%B4%EC%8D%AC/Python-%EA%B8%B0%EC%B4%88/) <br>
-	- [Python](https://github.com/wldnjd2/plotly) <br>
+	- [Python1](https://wldnjd2.github.io/categories/%ED%8C%8C%EC%9D%B4%EC%8D%AC/Python-%EA%B8%B0%EC%B4%88/) <br>
+	- [Python2](https://github.com/wldnjd2/plotly) <br>
+	- [Python3](https://github.com/wldnjd2/Python) <br>
 
 
 <br>
