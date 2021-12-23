@@ -51,12 +51,12 @@
 ### Ⅳ. 국비교육
 - 훈련과정명: [빅데이터분석] 파이썬 활용(Python) 빅데이터 분석 디지털 인재 양성과정 A
 - 훈련시간: 2021/09/09 - 2022/02/28
-- 주요 교과목 및 내용: 
-[JAVA](https://github.com/wldnjd2/JAVA)
-[데이터베이스](https://github.com/wldnjd2/DataBase)
-[JSP, Servlet](https://github.com/wldnjd2/JSP-Servlet)
-[Python](https://wldnjd2.github.io/categories/%ED%8C%8C%EC%9D%B4%EC%8D%AC/Python-%EA%B8%B0%EC%B4%88/)
-[Python](https://github.com/wldnjd2/plotly) 
+- 주요 교과목 및 내용: <br>
+[JAVA](https://github.com/wldnjd2/JAVA) <br>
+[데이터베이스](https://github.com/wldnjd2/DataBase) <br>
+[JSP, Servlet](https://github.com/wldnjd2/JSP-Servlet) <br>
+[Python](https://wldnjd2.github.io/categories/%ED%8C%8C%EC%9D%B4%EC%8D%AC/Python-%EA%B8%B0%EC%B4%88/) <br>
+[Python](https://github.com/wldnjd2/plotly) <br>
 
 
 <br>
