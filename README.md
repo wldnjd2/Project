@@ -48,13 +48,32 @@
 
 <br> 
 
-### Ⅳ. 자격증
+### Ⅳ. 국비교육
+- 훈련과정명: [빅데이터분석] 파이썬 활용(Python) 빅데이터 분석 디지털 인재 양성과정 A
+- 훈련시간: 2021/09/09 - 2022/02/28
+- 주요 교과목 및 내용: 
+[JAVA](https://github.com/wldnjd2/JAVA)
+[데이터베이스](https://github.com/wldnjd2/DataBase)
+[JSP, Servlet](https://github.com/wldnjd2/JSP-Servlet)
+[Python](https://wldnjd2.github.io/categories/%ED%8C%8C%EC%9D%B4%EC%8D%AC/Python-%EA%B8%B0%EC%B4%88/)
+[Python](https://github.com/wldnjd2/plotly) 
+
+
+<br>
+
+### Ⅴ.인터넷 강의 
+인프런
+부스트캠퍼스
+
+<br>
+
+### Ⅵ. 자격증
 - 정보처리기사 (2019년 취득)
 - 자동차운전면허증 2종보통 (2019년 취득)
 
 <br>
 
-### Ⅴ. 아르바이트
+### Ⅶ. 아르바이트
 - 수원 롯데몰 빌리엔젤 <br>
   2021/06/14 - 2021/10/29
 - 수원 롯데몰 스트릿츄러스  <br>
@@ -74,7 +93,7 @@
 
 <br> 
 
-### Ⅵ. Project Kaggle
+### Ⅷ. Project Kaggle
 - 대회: 2021 Kaggle Machine Learning & Data Science Survey <br>
   - 내용: 빅데이터에서 변화하는 트렌드를 분석하고, 시각화하는 프로젝트
   - 기간: 2021.11~ (한달)
