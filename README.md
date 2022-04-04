@@ -109,6 +109,7 @@
 - AJAX를 이용한 게시판 만들기
     - 내용: AJAX를 이용해 회사 기술 게시판 구현
     - 기간: 3월 14일 ~ 4월 1일
+    - [게시판 코드](https://github.com/wldnjd2/TechBoard)
     
     
 <br> 
