@@ -63,8 +63,7 @@
 <br>
 
 ### Ⅴ.인터넷 강의 
-인프런
-부스트캠퍼스
+패스트캠퍼스
 
 <br>
 
@@ -94,7 +93,9 @@
 
 <br> 
 
-### Ⅷ. Project Kaggle
+### Ⅷ. Project 
+
+1. Kaggle
 - 대회: 2021 Kaggle Machine Learning & Data Science Survey <br>
   - 내용: 빅데이터에서 변화하는 트렌드를 분석하고, 시각화하는 프로젝트
   - 기간: 2021.11~ (한달)
@@ -104,5 +105,17 @@
 - [Kaggle 제출 결과물](https://www.kaggle.com/yoonhwayam/newbies-as-a-data-scientist-in-east-asia)
 - [발표자료 PDF](https://github.com/wldnjd2/Project/blob/main/Project_kaggle/Kaggle%20competition_Newbie%20as%20a%20Data%20Scientist%20in%20East%20Asia.pdf)
 
-
+2. Spring 게시판
+- AJAX를 이용한 게시판 만들기
+    - 내용: AJAX를 이용해 회사 기술 게시판 구현
+    - 기간: 3월 14일 ~ 4월 1일
+    
+    
 <br> 
+
+### Ⅸ. 근무
+
+- Negga System <br>
+  2022/02/22 ~ 근무중
+  
+<br>
