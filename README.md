@@ -1,7 +1,7 @@
 ### Ⅰ. 기본정보
 - 이름: 김지원
 - 이메일: jeewon3665@gmail.com
-- Tech Blog: https://wldnjd2.github.io/
+- Tech Blog: https://wldnjd2.tistory.com/
 
 <br> 
 
